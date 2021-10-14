@@ -12,8 +12,8 @@ os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 if __name__ == '__main__':
 
     config = {'weight_file': './weight_file/SRCNN_x3_lr=1e-02_batch=128/',
-              'img_dir': '../datasets/Set14/',
-              'outputs_dir': './test_res/test_915_lr=1e-2_x3_Set14/',
+              'img_dir': '../datasets/Set5/',
+              'outputs_dir': './test_res/test_915_lr=1e-2_x3_Set5/',
               'scale': 3,
               'visual_filter': False
               }
@@ -84,7 +84,6 @@ if __name__ == '__main__':
         bic_ycbcr = bic_ycbcr[2*scale: -2*scale, 2*scale: -2*scale, :]
         # bic_y = bic_y[..., scale: -scale, scale: -scale]
         bic_y = bic_y[..., 2*scale: -2*scale, 2*scale: -2*scale]
-
 
         psnr = utils.calc_psnr(hr_y, preds)
         psnr2 = utils.calc_psnr(bic_y, hr_y)
