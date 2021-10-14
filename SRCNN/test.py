@@ -67,7 +67,8 @@ if __name__ == '__main__':
 
         lr_image = imresize(hr_image, 1. / scale, 'bicubic')
         bic_image = imresize(lr_image, scale, 'bicubic')
-        bic_pil = Image.fromarray(bic_image.astype(np.uint8)[scale: -scale, scale: -scale, :])
+        bic_pil = Image.fromarray(bic_image.astype(np.uint8)[2*scale: -2*scale, 2*scale: -2*scale, :])
+        # bic_pil = Image.fromarray(bic_image.astype(np.uint8)[scale: -scale, scale: -scale, :])
         bic_pil.save(outputs_dir + imgName.replace('.', f'_bicubic_x{scale}.'))
 
         bic_y, bic_ycbcr = utils.preprocess(bic_image, device)
@@ -84,12 +85,11 @@ if __name__ == '__main__':
         # bic_y = bic_y[..., scale: -scale, scale: -scale]
         bic_y = bic_y[..., 2*scale: -2*scale, 2*scale: -2*scale]
 
-
-        # psnr = utils.calc_psnr(hr_y, preds)
+        psnr = utils.calc_psnr(hr_y, preds)
         psnr2 = utils.calc_psnr(bic_y, hr_y)
-        # Avg_psnr.update(psnr, 1)
-        Avg_psnr.update(psnr2, 1)
-        # print(f'{imgName}, ' + 'PSNR: {:.2f}'.format(psnr.item()))
+        Avg_psnr.update(psnr, 1)
+        # Avg_psnr.update(psnr2, 1)
+        print(f'{imgName}, ' + 'PSNR: {:.2f}'.format(psnr.item()))
         print(f'{imgName}, ' + 'PSNR_bicubic: {:.2f}'.format(psnr2.item()))
         # GPU tensor -> CPU tensor -> numpy
         preds = preds.mul(255.0).cpu().numpy().squeeze(0).squeeze(0)

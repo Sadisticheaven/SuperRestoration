@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+from torch import nn
 from torch.backends import cudnn
 import utils
 from model import FSRCNN
@@ -9,8 +10,10 @@ import os
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 if __name__ == '__main__':
     config = {'weight_file': './weight_file/FSRCNN_x3_MSRA_T91_lr=e-2_batch=64/',
-              'img_dir': '../datasets/Set5/',
-              'outputs_dir': './test_res/test_56-12-4_Set5/',
+              # 'img_dir': '../datasets/BSDS200/',
+              'img_dir': '../datasets/Set14/',
+              # 'outputs_dir': './test_res/test_56-12-4_BSDS200/',
+              'outputs_dir': './test_res/test_56-12-4_Set14/',
               'in_size': 11,
               'out_size': 19,
               'scale': 3,
@@ -52,7 +55,10 @@ if __name__ == '__main__':
     #     else:
     #         raise KeyError(n)
     if config['visual_filter']:
-        ax = utils.viz_layer(model.deconv_layer.weight.cpu(), 56)
+        for L in model.extract_layer:
+            if isinstance(L, nn.Conv2d):
+                ax = utils.viz_layer(L.weight.cpu(), 56)
+        # ax = utils.viz_layer(model.deconv_layer.weight.cpu(), 56)
     model.eval()
     imglist = os.listdir(img_dir)
     Avg_psnr = utils.AverageMeter()
@@ -82,11 +88,10 @@ if __name__ == '__main__':
             preds = preds + bic_y
         preds = preds.clamp(0.0, 1.0)
         psnr = utils.calc_psnr(hr_y, preds)
-        # psnr2 = utils.calc_psnr(hr_y, bic_y)
+        psnr2 = utils.calc_psnr(hr_y, bic_y)
         Avg_psnr.update(psnr, 1)
-        # Avg_psnr.update(psnr2, 1)
         print(f'{imgName}, ' + 'PSNR: {:.2f}'.format(psnr.item()))
-        # print(f'{imgName}, ' + 'PSNR_bic: {:.2f}'.format(psnr2.item()))
+        print(f'{imgName}, ' + 'PSNR_bic: {:.2f}'.format(psnr2.item()))
         # GPU tensor -> CPU tensor -> numpy
         preds = preds.mul(255.0).cpu().numpy().squeeze(0).squeeze(0)
 
