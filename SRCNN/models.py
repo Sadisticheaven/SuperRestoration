@@ -5,11 +5,11 @@ class SRCNN(nn.Module):
     def __init__(self, padding=False, num_channels=1):
         super(SRCNN, self).__init__()
         self.pad1 = nn.ReplicationPad2d(4 * int(padding))
-        self.pad2 = nn.ReplicationPad2d(2 * int(padding))
         self.conv1 = nn.Sequential(nn.Conv2d(num_channels, 64, kernel_size=9, padding=0),
                                    nn.ReLU(inplace=True))
         self.conv2 = nn.Sequential(nn.Conv2d(64, 32, kernel_size=1, padding=0),  # n1 * 1 * 1 * n2
                                    nn.ReLU(inplace=True))
+        self.pad2 = nn.ReplicationPad2d(2 * int(padding))
         self.conv3 = nn.Conv2d(32, num_channels, kernel_size=5, padding=0)
 
     def forward(self, x):

@@ -16,7 +16,7 @@ if __name__ == '__main__':
               'img_dir': '../datasets/Set14/',
               'outputs_dir': './test_res/test_915_lr=1e-2_x3_Set14/',
               'scale': 3,
-              'visual_filter': False
+              'visual_filter': True
               }
 
     outputs_dir = config['outputs_dir']

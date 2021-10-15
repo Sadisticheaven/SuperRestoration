@@ -10,15 +10,16 @@ import os
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 if __name__ == '__main__':
     config = {'weight_file': './weight_file/FSRCNN_x3_MSRA_T91_lr=e-2_batch=64/',
+    # config = {'weight_file': './weight_file/FSRCNN_x3_MSRA_T91_lr=e-2_batch=64/',
               # 'img_dir': '../datasets/BSDS200/',
-              'img_dir': '../datasets/Set14/',
+              'img_dir': '../datasets/Set5/',
               # 'outputs_dir': './test_res/test_56-12-4_BSDS200/',
-              'outputs_dir': './test_res/test_56-12-4_Set14/',
+              'outputs_dir': './test_res/test_56-12-4_Set5/',
               'in_size': 11,
               'out_size': 19,
               'scale': 3,
               'residual': False,
-              'visual_filter': False
+              'visual_filter': True
               }
 
     outputs_dir = config['outputs_dir']
@@ -48,16 +49,8 @@ if __name__ == '__main__':
     else:
         model.load_state_dict(checkpoint)
 
-    # state_dict = model.state_dict()
-    # for n, p in torch.load(weight_file, map_location=lambda storage, loc: storage).items():
-    #     if n in state_dict.keys():
-    #         state_dict[n].copy_(p)
-    #     else:
-    #         raise KeyError(n)
     if config['visual_filter']:
-        for L in model.extract_layer:
-            if isinstance(L, nn.Conv2d):
-                ax = utils.viz_layer(L.weight.cpu(), 56)
+        ax = utils.viz_layer(model.extract_layer[0].weight.cpu(), 56)
         # ax = utils.viz_layer(model.deconv_layer.weight.cpu(), 56)
     model.eval()
     imglist = os.listdir(img_dir)
