@@ -11,9 +11,10 @@ from torch import nn
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 if __name__ == '__main__':
 
+    # config = {'weight_file': './weight_file/SRCNN_x3_data=matlab_lr=1e-2_batch=128/',
     config = {'weight_file': './weight_file/SRCNN_x3_lr=1e-02_batch=128/',
-              'img_dir': '../datasets/Set5/',
-              'outputs_dir': './test_res/test_915_lr=1e-2_x3_Set5/',
+              'img_dir': '../datasets/Set14/',
+              'outputs_dir': './test_res/test_915_lr=1e-2_x3_Set14/',
               'scale': 3,
               'visual_filter': False
               }
@@ -62,31 +63,27 @@ if __name__ == '__main__':
         lr_wid = image.width // scale
         lr_hei = image.height // scale
 
-        hr_image = image.crop((0, 0, lr_wid * scale, lr_hei * scale))
-        hr_image = np.array(hr_image)
+        gnd_image = image.crop((0, 0, lr_wid * scale, lr_hei * scale))
+        gnd_image = np.array(gnd_image)
 
-        lr_image = imresize(hr_image, 1. / scale, 'bicubic')
+        lr_image = imresize(gnd_image, 1. / scale, 'bicubic')
         bic_image = imresize(lr_image, scale, 'bicubic')
-        bic_pil = Image.fromarray(bic_image.astype(np.uint8)[2*scale: -2*scale, 2*scale: -2*scale, :])
-        # bic_pil = Image.fromarray(bic_image.astype(np.uint8)[scale: -scale, scale: -scale, :])
+        shave =  scale
+        bic_pil = Image.fromarray(bic_image.astype(np.uint8)[shave: -shave, shave: -shave, :])
         bic_pil.save(outputs_dir + imgName.replace('.', f'_bicubic_x{scale}.'))
 
         bic_y, bic_ycbcr = utils.preprocess(bic_image, device)
-        hr_y, _ = utils.preprocess(hr_image, device)
+        gnd_y, _ = utils.preprocess(gnd_image, device)
         with torch.no_grad():
             preds = model(bic_y).clamp(0.0, 1.0)
 
-        # hr_y = hr_y[..., scale: -scale, scale: -scale]
-        hr_y = hr_y[..., 2*scale: -2*scale, 2*scale: -2*scale]
-        # preds = preds[..., scale: -scale, scale: -scale]
-        preds = preds[..., 2*scale: -2*scale, 2*scale: -2*scale]
-        # bic_ycbcr = bic_ycbcr[scale: -scale, scale: -scale, :]
-        bic_ycbcr = bic_ycbcr[2*scale: -2*scale, 2*scale: -2*scale, :]
-        # bic_y = bic_y[..., scale: -scale, scale: -scale]
-        bic_y = bic_y[..., 2*scale: -2*scale, 2*scale: -2*scale]
+        gnd_y = gnd_y[..., shave: -shave, shave: -shave]
+        preds = preds[..., shave: -shave, shave: -shave]
+        bic_ycbcr = bic_ycbcr[shave: -shave, shave: -shave, :]
+        bic_y = bic_y[..., shave: -shave, shave: -shave]
 
-        psnr = utils.calc_psnr(hr_y, preds)
-        psnr2 = utils.calc_psnr(bic_y, hr_y)
+        psnr = utils.calc_psnr(gnd_y, preds)
+        psnr2 = utils.calc_psnr(gnd_y, bic_y)
         Avg_psnr.update(psnr, 1)
         # Avg_psnr.update(psnr2, 1)
         print(f'{imgName}, ' + 'PSNR: {:.2f}'.format(psnr.item()))
