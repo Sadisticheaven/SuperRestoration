@@ -7,17 +7,25 @@ class FSRCNN(nn.Module):
         super(FSRCNN, self).__init__()
         self.extract_layer = nn.Sequential(nn.Conv2d(num_channels, d, kernel_size=5),
                                            nn.PReLU())
+        # self.extract_layer = nn.Sequential(nn.Conv2d(num_channels, d, kernel_size=5, padding=2),
+        #                                    nn.PReLU(d))
 
         self.mid_part = [nn.Conv2d(d, s, kernel_size=1), nn.PReLU()]
+        # self.mid_part = [nn.Conv2d(d, s, kernel_size=1), nn.PReLU(s)]
         for i in range(m):
             self.mid_part.extend([nn.ReplicationPad2d(1),
                                   nn.Conv2d(s, s, kernel_size=3),
                                   nn.PReLU()])
+            # self.mid_part.extend([nn.Conv2d(s, s, kernel_size=3, padding=1),
+            #                       nn.PReLU(s)])
         self.mid_part.extend([nn.Conv2d(s, d, kernel_size=1), nn.PReLU()])
+        # self.mid_part.extend([nn.Conv2d(s, d, kernel_size=1), nn.PReLU(d)])
         self.mid_part = nn.Sequential(*self.mid_part)
         # 7->19
         self.deconv_layer = nn.ConvTranspose2d(d, num_channels, kernel_size=9, stride=scale_factor,
                                                padding=(9 + (in_size-5)*scale_factor - out_size)//2)
+        # self.deconv_layer = nn.ConvTranspose2d(d, num_channels, kernel_size=9, stride=scale_factor,
+        #                                        padding=(9 + (in_size-1)*scale_factor - out_size)//2)
 
     def init_weights(self, method='MSRA'):
         if method == 'MSRA':
