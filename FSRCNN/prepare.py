@@ -10,15 +10,16 @@ os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 def gen_traindata(config):
     scale = config["scale"]
     stride = config["stride"]
-    if config['residual']:
-        h5savepath = config["hrDir"] + f'_train_FSRCNNx{scale}_res.h5'
-    else:
-        h5savepath = config["hrDir"] + f'_train_FSRCNNx{scale}.h5'
-    hrDir = config["hrDir"] + '/'
     size_input = config["size_input"]
     size_label = size_input * scale
     size_output = config['size_output']
     padding = (size_label - size_output) // 2
+    if config['residual']:
+        h5savepath = config["hrDir"] + f'_label={size_output}_train_FSRCNNx{scale}_res.h5'
+    else:
+        h5savepath = config["hrDir"] + f'_label={size_output}_train_FSRCNNx{scale}.h5'
+    hrDir = config["hrDir"] + '/'
+
 
     h5_file = h5py.File(h5savepath, 'w')
     imgList = os.listdir(hrDir)
@@ -68,9 +69,9 @@ def gen_valdata(config):
     size_output = config['size_output']
     padding = (size_label - size_output) // 2
     if config['residual']:
-        h5savepath = config["hrDir"] + f'_val_FSRCNNx{scale}_res.h5'
+        h5savepath = config["hrDir"] + f'_label={size_output}_val_FSRCNNx{scale}_res.h5'
     else:
-        h5savepath = config["hrDir"] + f'_val_FSRCNNx{scale}.h5'
+        h5savepath = config["hrDir"] + f'_label={size_output}_val_FSRCNNx{scale}.h5'
     hrDir = config["hrDir"] + '/'
     h5_file = h5py.File(h5savepath, 'w')
     lr_group = h5_file.create_group('data')
@@ -107,7 +108,7 @@ def gen_valdata(config):
 
 if __name__ == '__main__':
     # config = {'hrDir': './test/flower', 'scale': 3, "stride": 14, "size_input": 33, "size_label": 21}
-    config = {'hrDir': '../datasets/T91_aug', 'scale': 3, 'stride': 10, "size_input": 11, "size_output": 19, "residual": False}
+    config = {'hrDir': '../datasets/T91_aug', 'scale': 3, 'stride': 10, "size_input": 11, "size_output": 27, "residual": False}
     gen_traindata(config)
     config['hrDir'] = '../datasets/Set5'
     gen_valdata(config)

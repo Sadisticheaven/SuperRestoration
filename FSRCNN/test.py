@@ -1,6 +1,5 @@
 import numpy as np
 import torch
-from torch import nn
 from torch.backends import cudnn
 import utils
 from model import FSRCNN
@@ -9,14 +8,14 @@ from imresize import imresize
 import os
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 if __name__ == '__main__':
-    config = {'weight_file': './weight_file/FSRCNN_x3_MSRA_T91_lr=e-2_batch=64/',
+    config = {'weight_file': './weight_file/FSRCNN_x3_MSRA_T91_lr=e-2_batch=64_input=9/',
     # config = {'weight_file': './weight_file/FSRCNN_x3_MSRA_T91_lr=e-2_batch=64/',
-              # 'img_dir': '../datasets/BSDS200/',
+    #           'img_dir': '../datasets/BSDS200/',
               'img_dir': '../datasets/Set5/',
               # 'outputs_dir': './test_res/test_56-12-4_BSDS200/',
               'outputs_dir': './test_res/test_56-12-4_Set5/',
               'in_size': 11,
-              'out_size': 19,
+              'out_size': 27,
               'scale': 3,
               'residual': False,
               'visual_filter': True
@@ -26,7 +25,8 @@ if __name__ == '__main__':
     scale = config['scale']
     in_size = config['in_size']
     out_size = config['out_size']
-    padding = (in_size * scale - out_size)//2
+    padding = abs(in_size * scale - out_size)//2
+    # padding = 3
     # weight_file = config['weight_file'] + f'best.pth'
     # weight_file = config['weight_file'] + f'FSRCNNx3_lr=e-2_91img.pth'
     weight_file = config['weight_file'] + f'x{scale}/best.pth'
@@ -50,8 +50,8 @@ if __name__ == '__main__':
         model.load_state_dict(checkpoint)
 
     if config['visual_filter']:
-        ax = utils.viz_layer(model.extract_layer[0].weight.cpu(), 56)
-        # ax = utils.viz_layer(model.deconv_layer.weight.cpu(), 56)
+        # ax = utils.viz_layer(model.extract_layer[0].weight.cpu(), 56)
+        ax = utils.viz_layer(model.deconv_layer.weight.cpu(), 56)
     model.eval()
     imglist = os.listdir(img_dir)
     Avg_psnr = utils.AverageMeter()
@@ -80,6 +80,7 @@ if __name__ == '__main__':
         if config['residual']:
             preds = preds + bic_y
         preds = preds.clamp(0.0, 1.0)
+        # preds = preds[..., padding: -padding, padding: -padding]
         psnr = utils.calc_psnr(hr_y, preds)
         psnr2 = utils.calc_psnr(hr_y, bic_y)
         Avg_psnr.update(psnr, 1)
