@@ -42,8 +42,7 @@ def gen_traindata(config):
         input = lr_y.astype(np.float32)
         # residual
         if config['residual']:
-            input_upscale = imresize(input, scale, 'bicubic')
-            input_upscale = input_upscale.astype(np.float32)
+            input_upscale = imresize(input, scale, 'bicubic').astype(np.float32)
             hr_y = hr_y - input_upscale
 
         for r in range(0, lr_hei - size_input + 1, stride):
@@ -94,9 +93,8 @@ def gen_valdata(config):
         data = lr_y.astype(np.float32)
         # residual
         if config['residual']:
-            input_upscale = imresize(input, scale, 'bicubic')
-            input_upscale = input_upscale.astype(np.float32)
-            label = hr_y - input_upscale
+            data_upscale = imresize(data, scale, 'bicubic')
+            label = hr_y - data_upscale
         else:
             label = hr_y
         label = label.astype(np.float32)[padding: -padding, padding: -padding]
@@ -108,7 +106,7 @@ def gen_valdata(config):
 
 if __name__ == '__main__':
     # config = {'hrDir': './test/flower', 'scale': 3, "stride": 14, "size_input": 33, "size_label": 21}
-    config = {'hrDir': '../datasets/T91_aug', 'scale': 3, 'stride': 10, "size_input": 11, "size_output": 27, "residual": False}
+    config = {'hrDir': '../datasets/T91_aug', 'scale': 3, 'stride': 10, "size_input": 11, "size_output": 19, "residual": True}
     gen_traindata(config)
     config['hrDir'] = '../datasets/Set5'
     gen_valdata(config)

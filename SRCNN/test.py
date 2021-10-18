@@ -16,7 +16,7 @@ if __name__ == '__main__':
               'img_dir': '../datasets/Set14/',
               'outputs_dir': './test_res/test_915_lr=1e-2_x3_Set14/',
               'scale': 3,
-              'visual_filter': True
+              'visual_filter': False
               }
 
     outputs_dir = config['outputs_dir']
@@ -59,27 +59,28 @@ if __name__ == '__main__':
     Avg_psnr = utils.AverageMeter()
     for imgName in imglist:
         img_file = img_dir + imgName
-        image = Image.open(img_file).convert('RGB')  # (width, height)
+        image = Image.open(img_file)  # (width, height)
         lr_wid = image.width // scale
         lr_hei = image.height // scale
-
-        gnd_image = image.crop((0, 0, lr_wid * scale, lr_hei * scale))
-        gnd_image = np.array(gnd_image)
+        image = image.crop((0, 0, lr_wid * scale, lr_hei * scale))
+        if image.mode != 'L':  # gray image don't need to convert
+            image = image.convert('RGB')
+        gnd_image = np.array(image)
 
         lr_image = imresize(gnd_image, 1. / scale, 'bicubic')
         bic_image = imresize(lr_image, scale, 'bicubic')
-        shave =  scale
-        bic_pil = Image.fromarray(bic_image.astype(np.uint8)[shave: -shave, shave: -shave, :])
+        shave = scale
+        bic_pil = Image.fromarray(bic_image.astype(np.uint8)[shave: -shave, shave: -shave, ...])
         bic_pil.save(outputs_dir + imgName.replace('.', f'_bicubic_x{scale}.'))
 
-        bic_y, bic_ycbcr = utils.preprocess(bic_image, device)
-        gnd_y, _ = utils.preprocess(gnd_image, device)
+        bic_y, bic_ycbcr = utils.preprocess(bic_image, device, image.mode)
+        gnd_y, _ = utils.preprocess(gnd_image, device, image.mode)
         with torch.no_grad():
             preds = model(bic_y).clamp(0.0, 1.0)
 
         gnd_y = gnd_y[..., shave: -shave, shave: -shave]
         preds = preds[..., shave: -shave, shave: -shave]
-        bic_ycbcr = bic_ycbcr[shave: -shave, shave: -shave, :]
+        bic_ycbcr = bic_ycbcr[shave: -shave, shave: -shave, ...]
         bic_y = bic_y[..., shave: -shave, shave: -shave]
 
         psnr = utils.calc_psnr(gnd_y, preds)
@@ -90,10 +91,12 @@ if __name__ == '__main__':
         print(f'{imgName}, ' + 'PSNR_bicubic: {:.2f}'.format(psnr2.item()))
         # GPU tensor -> CPU tensor -> numpy
         preds = preds.mul(255.0).cpu().numpy().squeeze(0).squeeze(0)
-
-        output = np.array([preds, bic_ycbcr[..., 1], bic_ycbcr[..., 2]]).transpose([1, 2, 0])  # chw -> hwc
-        output = np.clip(utils.ycbcr2rgb(output), 0.0, 255.0).astype(np.uint8)
-        bic_output = np.clip(utils.ycbcr2rgb(bic_ycbcr), 0.0, 255.0).astype(np.uint8)
+        if image.mode == 'L':
+            output = np.clip(preds, 0.0, 255.0).astype(np.uint8)  # chw -> hwc
+        else:
+            output = np.array([preds, bic_ycbcr[..., 1], bic_ycbcr[..., 2]]).transpose([1, 2, 0])  # chw -> hwc
+            output = np.clip(utils.ycbcr2rgb(output), 0.0, 255.0).astype(np.uint8)
         output = Image.fromarray(output)  # hw -> wh
+
         output.save(outputs_dir + imgName.replace('.', f'_SRCNNx{scale}.'))
     print('Average_PSNR: {:.2f}'.format(Avg_psnr.avg))

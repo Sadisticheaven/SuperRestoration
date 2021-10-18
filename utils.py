@@ -79,14 +79,22 @@ class AverageMeter(object):
         self.avg = self.sum / self.count
 
 
-def preprocess(img, device):
-    img = np.array(img).astype(np.float32)  # (width, height, channel) -> (height, width, channel)
-    ycbcr = rgb2ycbcr(img).astype(np.float32)
-    y = ycbcr[..., 0]
-    y /= 255.
-    y = torch.from_numpy(y).to(device)  # numpy -> cpu tensor -> GPU tensor
-    y = y.unsqueeze(0).unsqueeze(0)  # input Tensor Dimension: batch_size * channel * H * W
-    return y, ycbcr
+def preprocess(img, device, image_mode='RGB'):
+    if image_mode == 'RGB':
+        img = np.array(img).astype(np.float32)  # (width, height, channel) -> (height, width, channel)
+        ycbcr = rgb2ycbcr(img).astype(np.float32)
+        y = ycbcr[..., 0]
+        y /= 255.
+        y = torch.from_numpy(y).to(device)  # numpy -> cpu tensor -> GPU tensor
+        y = y.unsqueeze(0).unsqueeze(0)  # input Tensor Dimension: batch_size * channel * H * W
+        return y, ycbcr
+    else:
+        y = img.astype(np.float32)  # (width, height, channel) -> (height, width, channel)
+        y /= 255.
+        y = torch.from_numpy(y).to(device)  # numpy -> cpu tensor -> GPU tensor
+        y = y.unsqueeze(0).unsqueeze(0)  # input Tensor Dimension: batch_size * channel * H * W
+        return y, y
+
 
 # helper function for visualizing the output of a given layer
 # default number of filters is 4

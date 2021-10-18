@@ -8,17 +8,17 @@ from imresize import imresize
 import os
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 if __name__ == '__main__':
-    config = {'weight_file': './weight_file/FSRCNN_x3_MSRA_T91_lr=e-2_batch=64_input=9/',
+    config = {'weight_file': './weight_file/FSRCNN_x3_MSRA_T91_lr=e-1_batch=128_input=11/',
     # config = {'weight_file': './weight_file/FSRCNN_x3_MSRA_T91_lr=e-2_batch=64/',
     #           'img_dir': '../datasets/BSDS200/',
-              'img_dir': '../datasets/Set5/',
-              # 'outputs_dir': './test_res/test_56-12-4_BSDS200/',
-              'outputs_dir': './test_res/test_56-12-4_Set5/',
+              'img_dir': '../datasets/Set14/',
+              # 'outputs_dir': './test_res/test_11-27_BSDS200/',
+              'outputs_dir': './test_res/test_11-19_Set14/',
               'in_size': 11,
               'out_size': 27,
               'scale': 3,
               'residual': False,
-              'visual_filter': True
+              'visual_filter': False
               }
 
     outputs_dir = config['outputs_dir']
@@ -26,7 +26,7 @@ if __name__ == '__main__':
     in_size = config['in_size']
     out_size = config['out_size']
     padding = abs(in_size * scale - out_size)//2
-    # padding = 3
+    # padding = scale
     # weight_file = config['weight_file'] + f'best.pth'
     # weight_file = config['weight_file'] + f'FSRCNNx3_lr=e-2_91img.pth'
     weight_file = config['weight_file'] + f'x{scale}/best.pth'
@@ -50,30 +50,32 @@ if __name__ == '__main__':
         model.load_state_dict(checkpoint)
 
     if config['visual_filter']:
-        # ax = utils.viz_layer(model.extract_layer[0].weight.cpu(), 56)
-        ax = utils.viz_layer(model.deconv_layer.weight.cpu(), 56)
+        ax = utils.viz_layer(model.extract_layer[0].weight.cpu(), 56)
+        # ax = utils.viz_layer(model.deconv_layer.weight.cpu(), 56)
     model.eval()
     imglist = os.listdir(img_dir)
     Avg_psnr = utils.AverageMeter()
     for imgName in imglist:
         img_file = img_dir + imgName
-        image = Image.open(img_file).convert('RGB') # (width, height)
+        image = Image.open(img_file)  # (width, height)
         lr_wid = image.width // scale
         lr_hei = image.height // scale
-        hr_image = image.crop((0, 0, lr_wid * scale, lr_hei * scale))
-        hr_image = np.array(hr_image)
+        image = image.crop((0, 0, lr_wid * scale, lr_hei * scale))
+        if image.mode != 'L':  # gray image don't need to convert
+            image = image.convert('RGB')
+        hr_image = np.array(image)
 
         lr_image = imresize(hr_image, 1. / scale, 'bicubic')
         bic_image = imresize(lr_image, scale, 'bicubic')
-        bic_image = bic_image[padding: -padding, padding: -padding, :]
+        bic_image = bic_image[padding: -padding, padding: -padding, ...]
         bic_pil = Image.fromarray(bic_image.astype(np.uint8))
         bic_pil.save(outputs_dir + imgName.replace('.', f'_bicubic_x{scale}.'))
 
-        hr_image = hr_image[padding: -padding, padding: -padding, :]
+        hr_image = hr_image[padding: -padding, padding: -padding, ...]
 
-        lr_y, _ = utils.preprocess(lr_image, device)
-        hr_y, _ = utils.preprocess(hr_image, device)
-        bic_y, ycbcr = utils.preprocess(bic_image, device)
+        lr_y, _ = utils.preprocess(lr_image, device, image.mode)
+        hr_y, _ = utils.preprocess(hr_image, device, image.mode)
+        bic_y, ycbcr = utils.preprocess(bic_image, device, image.mode)
 
         with torch.no_grad():
             preds = model(lr_y)
@@ -88,9 +90,11 @@ if __name__ == '__main__':
         print(f'{imgName}, ' + 'PSNR_bic: {:.2f}'.format(psnr2.item()))
         # GPU tensor -> CPU tensor -> numpy
         preds = preds.mul(255.0).cpu().numpy().squeeze(0).squeeze(0)
-
-        output = np.array([preds, ycbcr[..., 1], ycbcr[..., 2]]).transpose([1, 2, 0]) # chw -> hwc
-        output = np.clip(utils.ycbcr2rgb(output), 0.0, 255.0).astype(np.uint8)
+        if image.mode == 'L':
+            output = np.clip(preds, 0.0, 255.0).astype(np.uint8)  # chw -> hwc
+        else:
+            output = np.array([preds, ycbcr[..., 1], ycbcr[..., 2]]).transpose([1, 2, 0]) # chw -> hwc
+            output = np.clip(utils.ycbcr2rgb(output), 0.0, 255.0).astype(np.uint8)
         output = Image.fromarray(output) # hw -> wh
         output.save(outputs_dir + imgName.replace('.', f'_FSRCNN_x{scale}.'))
     print('Average_PSNR: {:.2f}'.format(Avg_psnr.avg))

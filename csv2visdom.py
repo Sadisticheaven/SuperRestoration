@@ -94,9 +94,10 @@ def visual_csv2(csv_path, viz, line_name):
 
 if __name__ == '__main__':
     viz = Visdom(env='FSRCNN')
-    visual_csv('./FSRCNN/weight_file/FSRCNN_x3_MSRA_T91_lr=e-2_batch=64/x3/FSRCNN_x3_MSRA_T91_lr=e-2_batch=64.csv', viz=viz, line_name='baseline')
-    visual_csv('./FSRCNN/weight_file/FSRCNN_x3_MSRA_T91_lr=e-2_batch=64_input=7/x3/FSRCNN_x3_MSRA_T91_lr=e-2_batch=64_input=7.csv', viz=viz, line_name='deconv_input=7')
-    visual_csv('./FSRCNN/weight_file/FSRCNN_x3_MSRA_T91_lr=e-2_batch=64_input=9/x3/FSRCNN_x3_MSRA_T91_lr=e-2_batch=64_input=9.csv', viz=viz, line_name='deconv_input=9')
+    visual_csv('./FSRCNN/weight_file/FSRCNN_x3_MSRA_T91_lr=e-2_batch=64_input=9/x3/FSRCNN_x3_MSRA_T91_lr=e-2_batch=64_input=9.csv', viz=viz, line_name='baseline')
+    visual_csv('./FSRCNN/weight_file/FSRCNN_x3_MSRA_T91_lr=e-1_batch=128_input=9/x3/FSRCNN_x3_MSRA_T91_lr=e-1_batch=128_input=9.csv', viz=viz, line_name='9-19')
+    visual_csv('./FSRCNN/weight_file/FSRCNN_x3_MSRA_T91_lr=e-1_batch=128_input=11/x3/FSRCNN_x3_MSRA_T91_lr=e-1_batch=128_input=11.csv', viz=viz, line_name='11-19')
+    visual_csv('./FSRCNN/weight_file/FSRCNN_x3_MSRA_T91_lr=e-1_batch=128_out=27/x3/FSRCNN_x3_MSRA_T91_lr=e-1_batch=128_out=27.csv', viz=viz, line_name='11-27')
     # visual_csv('./FSRCNN/weight_file/FSRCNN_56-12-4_MSRA_General191_stride=3_x3_res.csv', viz=viz, line_name='residual')
     # visual_csv('./SRCNN/weight_file/SRCNN_x3_lr=1e-02_batch=128/x3/SRCNN_x3_lr=1e-02_batch=128.csv', viz=viz, line_name='data=python')
     # visual_csv('./SRCNN/weight_file/SRCNN_x3_data=matlab_lr=1e-2_batch=128/x3/SRCNN_x3_data=matlab_lr=1e-2_batch=128.csv', viz=viz, line_name='data=matlab')
