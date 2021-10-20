@@ -2,23 +2,27 @@ import numpy as np
 import torch
 from torch.backends import cudnn
 import utils
-from model import FSRCNN
+from model import FSRCNN, N2_10_4
 from PIL import Image
 from imresize import imresize
 import os
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 if __name__ == '__main__':
-    config = {'weight_file': './weight_file/FSRCNN_x3_MSRA_T91_lr=e-1_batch=128_input=11/',
-    # config = {'weight_file': './weight_file/FSRCNN_x3_MSRA_T91_lr=e-2_batch=64/',
+    # config = {'weight_file': './weight_file/FSRCNN_x3_Xavier_T91_lr=e-2_batch=64_input=11/',
+    config = {'weight_file': './weight_file/N2-10-4_x3_MSRA_T91resMod_lr=e-1_batch=128_out=19/',
+    # config = {'weight_file': './weight_file/FSRCNN_x3_MSRA_G191resMod_lr=1e-1_batch=128_input=11/',
     #           'img_dir': '../datasets/BSDS200/',
               'img_dir': '../datasets/Set14/',
               # 'outputs_dir': './test_res/test_11-27_BSDS200/',
-              'outputs_dir': './test_res/test_11-19_Set14/',
+              # 'outputs_dir': './test_res/test_11-19_Set14/',
+              'outputs_dir': './test_res/test_N2-10-4_Set14/',
+              # 'outputs_dir': './test_res/test_Xavier_Set5/',
+              # 'outputs_dir': './test_res/test_191res_Set14/',
               'in_size': 11,
               'out_size': 27,
               'scale': 3,
-              'residual': False,
-              'visual_filter': False
+              'residual': True,
+              'visual_filter': True
               }
 
     outputs_dir = config['outputs_dir']
@@ -42,7 +46,8 @@ if __name__ == '__main__':
     cudnn.benchmark = True
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
-    model = FSRCNN(scale, in_size, out_size).to(device)
+    model = N2_10_4(scale, in_size, out_size).to(device)
+    # model = FSRCNN(scale, in_size, out_size).to(device)
     checkpoint = torch.load(weight_file)
     if len(checkpoint) < 6:
         model.load_state_dict(checkpoint['model'])
@@ -51,7 +56,7 @@ if __name__ == '__main__':
 
     if config['visual_filter']:
         ax = utils.viz_layer(model.extract_layer[0].weight.cpu(), 56)
-        # ax = utils.viz_layer(model.deconv_layer.weight.cpu(), 56)
+        ax = utils.viz_layer(model.deconv_layer.weight.cpu(), 56)
     model.eval()
     imglist = os.listdir(img_dir)
     Avg_psnr = utils.AverageMeter()

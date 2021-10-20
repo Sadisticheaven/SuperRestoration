@@ -4,9 +4,9 @@ import utils
 import os
 import torch
 from torch.backends import cudnn
-from model import N2_10_4
 from torch import nn, optim
-from SRCNN.SRCNNdatasets import T91TrainDataset, T91ValDataset
+from model import N2_10_4, CLoss
+from FSRCNNdatasets import T91TrainDataset, T91ValDataset, T91ResValDataset
 from torch.utils.data.dataloader import DataLoader
 # 导入Visdom类
 from visdom import Visdom
@@ -30,7 +30,6 @@ def train_model(config, from_pth=False, useVisdom=False):
     scale = config['scale']
     in_size = config['in_size']
     out_size = config['out_size']
-    lr = config['lr']
     batch_size = config['batch_size']
     num_epochs = config['num_epochs']
     num_workers = config['num_workers']
@@ -39,6 +38,10 @@ def train_model(config, from_pth=False, useVisdom=False):
     utils.mkdirs(outputs_dir)
     csv_file = outputs_dir + config['csv_name']
 
+    lr = config['lr']
+    gradient_clip = config['gradient_clip']
+    weight_decay = config['weight_decay']
+
     cudnn.benchmark = True
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     torch.manual_seed(seed)
@@ -46,21 +49,43 @@ def train_model(config, from_pth=False, useVisdom=False):
     model = N2_10_4(scale, in_size, out_size, num_channels=1, d=config['d'], m=config['m'])
     if not from_pth:
         model.init_weights(method=config['init'])
-    criterion = nn.MSELoss().cuda()
+    criterion = CLoss().cuda()
 
+    extract_weight = [n.weight for n in model.extract_layer if isinstance(n, nn.Conv2d)]
+    extract_PReLU = [n.weight for n in model.extract_layer if isinstance(n, nn.PReLU)]
+    extract_bias = [n.bias for n in model.extract_layer if isinstance(n, nn.Conv2d)]
+    mid_weight = [n.weight for n in model.mid_part if isinstance(n, nn.Conv2d)]
+    mid_PReLU = [n.weight for n in model.mid_part if isinstance(n, nn.PReLU)]
+    mid_bias = [n.bias for n in model.mid_part if isinstance(n, nn.Conv2d)]
+    deconv_weight = model.deconv_layer.weight
+    deconv_bias = model.deconv_layer.bias
     optimizer = optim.SGD([
-        {'params': model.extract_layer.parameters()},
-        {'params': model.mid_part.parameters()},
-        {'params': model.deconv_layer.parameters(), 'lr': lr * 0.1}
+        {'params': extract_weight, 'weight_decay': weight_decay},
+        {'params': extract_PReLU},
+        {'params': extract_bias, 'lr': lr},
+
+        {'params': mid_weight, 'weight_decay': weight_decay},
+        {'params': mid_PReLU},
+        {'params': mid_bias, 'lr': lr},
+
+        {'params': deconv_weight, 'weight_decay': weight_decay, 'lr':  lr * 0.1},
+        {'params': deconv_bias, 'lr': lr * 0.1},
+    # optimizer = optim.SGD([
+    #     {'params': model.extract_layer.parameters()},
+    #     {'params': model.mid_part.parameters()},
+    #     {'params': model.deconv_layer.parameters(), 'lr': lr * 0.1},
     ], lr=lr, momentum=0.9)  # 前两层学习率lr， 最后一层学习率lr*0.1
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', patience=50)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=config['step_size'], gamma=config['gamma'])
     train_dataset = T91TrainDataset(train_file)
     train_dataloader = DataLoader(dataset=train_dataset,
                                   batch_size=batch_size,
                                   shuffle=True,
                                   num_workers=num_workers,
                                   pin_memory=True)
-    val_dataset = T91ValDataset(val_file)
+    if config['residual']:
+        val_dataset = T91ResValDataset(val_file)
+    else:
+        val_dataset = T91ValDataset(val_file)
     val_dataloader = DataLoader(dataset=val_dataset, batch_size=1)
     # ----END------
 
@@ -120,6 +145,7 @@ def train_model(config, from_pth=False, useVisdom=False):
                 epoch_losses.update(loss.item(), len(inputs))
 
                 loss.backward()  # 反向传播
+                torch.nn.utils.clip_grad_value_(model.parameters(), gradient_clip)
                 optimizer.step()
 
                 t.set_postfix(loss='{:.6f}'.format(epoch_losses.avg))
@@ -134,16 +160,23 @@ def train_model(config, from_pth=False, useVisdom=False):
         model.eval()
         epoch_psnr = utils.AverageMeter()
         for data in val_dataloader:
-            inputs, labels = data
+            inputs = data[0]
+            labels = data[1]
             inputs = inputs.to(device)
             labels = labels.to(device)
+            if config['residual']:
+                bicubic = data[2]
+                bicubic = bicubic.to(device)
+
             with torch.no_grad():
                 preds = model(inputs)
-                preds = preds.clamp(0.0, 1.0)
+            if config['residual']:
+                preds = preds + bicubic
+            preds = preds.clamp(0.0, 1.0)
             epoch_psnr.update(utils.calc_psnr(preds, labels).item(), len(inputs))
         print('eval psnr: {:.2f}'.format(epoch_psnr.avg))
         if config['auto_lr']:
-            scheduler.step(epoch_psnr.avg)
+            scheduler.step()
         state = {'model': model.state_dict(), 'optimizer': optimizer.state_dict(), 'epoch': epoch,
                  'loss': epoch_losses.avg, 'psnr': epoch_psnr.avg}
         torch.save(state, outputs_dir + f'latest.pth')

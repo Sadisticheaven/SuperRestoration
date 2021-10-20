@@ -27,7 +27,7 @@ def gen_traindata(config):
     hr_subimgs = []
     for imgName in imgList:
         tpath = os.path.join(hrDir + imgName)
-        hrIMG = Image.open(tpath).convert('RGB')
+        hrIMG = Image.open(tpath)
 
         lr_wid = hrIMG.width // scale
         lr_hei = hrIMG.height // scale
@@ -35,8 +35,14 @@ def gen_traindata(config):
         hr_hei = lr_hei * scale
 
         hrIMG = hrIMG.crop((0, 0, hr_wid, hr_hei))
-        hr = np.array(hrIMG)
-        hr_y = utils.rgb2ycbcr(hr).astype(np.float32)[..., 0]
+
+        if hrIMG.mode == 'L':
+            hr = np.array(hrIMG)
+            hr_y = hr.astype(np.float32)
+        else:
+            hrIMG.convert('RGB')
+            hr = np.array(hrIMG)
+            hr_y = utils.rgb2ycbcr(hr).astype(np.float32)[..., 0]
 
         lr_y = imresize(hr_y, 1 / scale, 'bicubic')
         input = lr_y.astype(np.float32)
@@ -75,10 +81,12 @@ def gen_valdata(config):
     h5_file = h5py.File(h5savepath, 'w')
     lr_group = h5_file.create_group('data')
     hr_group = h5_file.create_group('label')
+    if config['residual']:
+        bic_group = h5_file.create_group('bicubic')
     imgList = os.listdir(hrDir)
     for i, imgName in enumerate(imgList):
         tpath = os.path.join(hrDir + imgName)
-        hrIMG = Image.open(tpath).convert('RGB')
+        hrIMG = Image.open(tpath)
 
         lr_wid = hrIMG.width // scale
         lr_hei = hrIMG.height // scale
@@ -86,21 +94,25 @@ def gen_valdata(config):
         hr_hei = lr_hei * scale
 
         hrIMG = hrIMG.crop((0, 0, hr_wid, hr_hei))
-        hr = np.array(hrIMG)
-        hr_y = utils.rgb2ycbcr(hr).astype(np.float32)[..., 0]
+        if hrIMG.mode == 'L':
+            hr_y = np.array(hrIMG).astype(np.float32)
+        else:
+            hrIMG = hrIMG.convert('RGB')
+            hr = np.array(hrIMG)
+            hr_y = utils.rgb2ycbcr(hr).astype(np.float32)[..., 0]
 
         lr_y = imresize(hr_y, 1 / scale, 'bicubic')
         data = lr_y.astype(np.float32)
         # residual
         if config['residual']:
-            data_upscale = imresize(data, scale, 'bicubic')
-            label = hr_y - data_upscale
-        else:
-            label = hr_y
-        label = label.astype(np.float32)[padding: -padding, padding: -padding]
+            bic_y = imresize(lr_y, scale, 'bicubic').astype(np.float32)
+            bic_y = bic_y[padding: -padding, padding: -padding]
+        label = hr_y.astype(np.float32)[padding: -padding, padding: -padding]
 
         lr_group.create_dataset(str(i), data=data)
         hr_group.create_dataset(str(i), data=label)
+        if config['residual']:
+            bic_group.create_dataset(str(i), data=bic_y)
 
     h5_file.close()
 

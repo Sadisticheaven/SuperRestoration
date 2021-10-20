@@ -6,7 +6,7 @@ import torch
 from torch.backends import cudnn
 from model import FSRCNN
 from torch import nn, optim
-from SRCNN.SRCNNdatasets import T91TrainDataset, T91ValDataset
+from FSRCNNdatasets import T91TrainDataset, T91ValDataset, T91ResValDataset
 from torch.utils.data.dataloader import DataLoader
 # 导入Visdom类
 from visdom import Visdom
@@ -61,7 +61,10 @@ def train_model(config, from_pth=False, useVisdom=False):
                                   shuffle=True,
                                   num_workers=num_workers,
                                   pin_memory=True)
-    val_dataset = T91ValDataset(val_file)
+    if config['residual']:
+        val_dataset = T91ResValDataset(val_file)
+    else:
+        val_dataset = T91ValDataset(val_file)
     val_dataloader = DataLoader(dataset=val_dataset, batch_size=1)
     # ----END------
 
@@ -136,12 +139,19 @@ def train_model(config, from_pth=False, useVisdom=False):
         model.eval()
         epoch_psnr = utils.AverageMeter()
         for data in val_dataloader:
-            inputs, labels = data
+            inputs = data[0]
+            labels = data[1]
             inputs = inputs.to(device)
             labels = labels.to(device)
+            if config['residual']:
+                bicubic = data[2]
+                bicubic = bicubic.to(device)
+
             with torch.no_grad():
                 preds = model(inputs)
-                preds = preds.clamp(0.0, 1.0)
+            if config['residual']:
+                preds = preds + bicubic
+            preds = preds.clamp(0.0, 1.0)
             epoch_psnr.update(utils.calc_psnr(preds, labels).item(), len(inputs))
         print('eval psnr: {:.2f}'.format(epoch_psnr.avg))
         if config['auto_lr']:
