@@ -121,3 +121,20 @@ class CLoss(nn.Module):
         error = torch.sqrt(diff * diff + self.delta2)
         loss = torch.mean(error)
         return loss
+
+class HuberLoss(nn.Module):
+    """Huber loss."""
+
+    def __init__(self, delta=2e-4):
+        super(HuberLoss, self).__init__()
+        self.delta = delta
+        self.delta2 = delta * delta
+
+    def forward(self, X, Y):
+        abs_diff = abs(torch.add(X, -Y))
+        cond = torch.less_equal(abs_diff, self.delta)
+        large_loss = 0.5 * abs_diff * abs_diff
+        small_loss = self.delta * abs_diff - 0.5 * self.delta2
+        error = torch.where(cond, large_loss, small_loss)
+        loss = torch.mean(error)
+        return loss

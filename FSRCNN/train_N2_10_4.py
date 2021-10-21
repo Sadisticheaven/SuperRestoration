@@ -5,7 +5,7 @@ import os
 import torch
 from torch.backends import cudnn
 from torch import nn, optim
-from model import N2_10_4, CLoss
+from model import N2_10_4, CLoss, HuberLoss
 from FSRCNNdatasets import T91TrainDataset, T91ValDataset, T91ResValDataset
 from torch.utils.data.dataloader import DataLoader
 # 导入Visdom类
@@ -49,7 +49,13 @@ def train_model(config, from_pth=False, useVisdom=False):
     model = N2_10_4(scale, in_size, out_size, num_channels=1, d=config['d'], m=config['m'])
     if not from_pth:
         model.init_weights(method=config['init'])
-    criterion = CLoss().cuda()
+
+    if config['Loss'] == 'CLoss':
+        criterion = CLoss(delta=config['delta']).cuda()
+    elif config['Loss'] == 'Huber':
+        criterion = HuberLoss(delta=config['delta']).cuda()
+    else:
+        criterion = nn.MSELoss().cuda()
 
     extract_weight = [n.weight for n in model.extract_layer if isinstance(n, nn.Conv2d)]
     extract_PReLU = [n.weight for n in model.extract_layer if isinstance(n, nn.PReLU)]
@@ -145,7 +151,7 @@ def train_model(config, from_pth=False, useVisdom=False):
                 epoch_losses.update(loss.item(), len(inputs))
 
                 loss.backward()  # 反向传播
-                torch.nn.utils.clip_grad_value_(model.parameters(), gradient_clip)
+                # torch.nn.utils.clip_grad_value_(model.parameters(), gradient_clip)
                 optimizer.step()
 
                 t.set_postfix(loss='{:.6f}'.format(epoch_losses.avg))
