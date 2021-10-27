@@ -72,9 +72,9 @@ def train_model(config, from_pth=False, useVisdom=False):
     print("===> Building model")
     model = G()
     if not from_pth:
-        model.init_weights()
-    criterion = nn.MSELoss(size_average=False).cuda()
-    optimizer = optim.Adam(model.parameters(), lr=lr, betas=0.9)
+        model.init_weight()
+    criterion = nn.MSELoss().cuda()
+    optimizer = optim.Adam(model.parameters(), lr=lr)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', patience=50)
     # ----END------
 

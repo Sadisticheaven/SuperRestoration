@@ -18,7 +18,7 @@ def T91_aug():
         fopen = Image.open(tpath)
         for angle in list({0, 90, 180, 270}):
             img = fopen.rotate(angle, expand=True)
-            name = savePath + spath[0] + f'_{i}_' + str(angle)
+            name = savePath + spath[0] + '_' + str(angle)
             img.save(name + '_x1.0.bmp')  # + spath[1])
             img = np.array(img)
             for scale in list({0.6, 0.7, 0.8, 0.9}):

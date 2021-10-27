@@ -13,12 +13,8 @@ def gen_traindata(config):
     size_input = config["size_input"]
     size_label = size_input * scale
     size_output = config['size_output']
-    padding = (size_label - size_output) // 2
     method = config['method']
-    if config['residual']:
-        h5savepath = config["hrDir"] + f'_label={size_output}_train_SRResNetx{scale}_res.h5'
-    else:
-        h5savepath = config["hrDir"] + f'_label={size_output}_train_SRResNetx{scale}.h5'
+    h5savepath = config["hrDir"] + f'_label={size_output}_train_SRResNetx{scale}.h5'
     hrDir = config["hrDir"] + '/'
 
 
@@ -46,15 +42,26 @@ def gen_traindata(config):
             for c in range(0, lr_wid - size_input + 1, stride):
                 lr_subimgs.append(input[r: r + size_input, c: c + size_input])
                 label = hr[r * scale: r * scale + size_label, c * scale: c * scale + size_label]
-                label = label[padding: -padding, padding: -padding]
                 hr_subimgs.append(label)
 
     lr_subimgs = np.array(lr_subimgs).astype(np.float32)
-    hr_subimgs = np.array(hr_subimgs).astype(np.float32)
-
     h5_file.create_dataset('data', data=lr_subimgs)
-    h5_file.create_dataset('label', data=hr_subimgs)
-
+    lr_subimgs = []
+    # HR dataset is too large to convert to ndarray, so convert it by several parts.
+    num = len(hr_subimgs)
+    seg = num // scale
+    hr_imgs = np.array(hr_subimgs[0: seg]).astype(np.float32)
+    dl = h5_file.create_dataset('label', data=hr_imgs, maxshape=[num, 96, 96, 3])
+    for i in range(1, scale):
+        hr_imgs = []
+        hr_imgs = np.array(hr_subimgs[i*seg: (i+1)*seg]).astype(np.float32)
+        dl.resize(((i+1)*seg, 96, 96, 3))
+        dl[i*seg:] = hr_imgs
+    hr_imgs = []
+    hr_imgs = np.array(hr_subimgs[scale*seg: num]).astype(np.float32)
+    dl.resize((num, 96, 96, 3))
+    dl[scale*seg:] = hr_imgs
+    hr_imgs = []
     h5_file.close()
 
 
@@ -63,12 +70,8 @@ def gen_valdata(config):
     size_input = config["size_input"]
     size_label = size_input * scale
     size_output = config['size_output']
-    padding = (size_label - size_output) // 2
     method = config['method']
-    if config['residual']:
-        h5savepath = config["hrDir"] + f'_label={size_output}_val_SRResNetx{scale}_res.h5'
-    else:
-        h5savepath = config["hrDir"] + f'_label={size_output}_val_SRResNetx{scale}.h5'
+    h5savepath = config["hrDir"] + f'_label={size_output}_val_SRResNetx{scale}.h5'
     hrDir = config["hrDir"] + '/'
     h5_file = h5py.File(h5savepath, 'w')
     lr_group = h5_file.create_group('data')
@@ -90,7 +93,7 @@ def gen_valdata(config):
         lr = imresize(hr, 1 / scale, method)
         data = lr.astype(np.float32)
         # residual
-        label = hr.astype(np.float32)[padding: -padding, padding: -padding]
+        label = hr.astype(np.float32)
 
         lr_group.create_dataset(str(i), data=data)
         hr_group.create_dataset(str(i), data=label)

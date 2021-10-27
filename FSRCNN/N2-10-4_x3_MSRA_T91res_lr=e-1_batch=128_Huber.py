@@ -19,14 +19,17 @@ if __name__ == '__main__':
               'step_size': 1500,
               'gamma': 0.1,
               'gradient_clip': 1,
-              'weight_decay': 1e-5,
+              'weight_decay': 0,
               'batch_size': 128,
               'num_epochs': 50000,
               'num_workers': 4,
               'seed': 123,
               'init': 'MSRA',
               'Gpu': '0',
-              'auto_lr': False
+              'auto_lr': False,
+              'residual': True,
+              'Loss': 'Huber',
+              'delta': 0.8
               }
 
     train_model(config, from_pth=False, useVisdom=False)
