@@ -108,6 +108,8 @@ def viz_layer(layer, n_filters=4):
     for index, filter in enumerate(layer):
         plt.subplots_adjust(wspace=0.05, hspace=0.05)
         plt.subplot(8, 8, index + 1)
+        # min = torch.min(filter).item()
+        # max = torch.max(filter).item()
         filter = (filter - min)/(max - min)
         # plt.imshow(transforms1(filter.detach())[0, :, :],  cmap='gray')
         plt.imshow(filter[0, :, :].detach(),  cmap='gray')

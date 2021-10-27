@@ -16,9 +16,9 @@ def gen_traindata(config):
     padding = (size_label - size_output) // 2
     method = config['method']
     if config['residual']:
-        h5savepath = config["hrDir"] + f'_label={size_output}_train_FSRCNNx{scale}_res.h5'
+        h5savepath = config["hrDir"] + f'_label={size_output}_train_SRResNetx{scale}_res.h5'
     else:
-        h5savepath = config["hrDir"] + f'_label={size_output}_train_FSRCNNx{scale}.h5'
+        h5savepath = config["hrDir"] + f'_label={size_output}_train_SRResNetx{scale}.h5'
     hrDir = config["hrDir"] + '/'
 
 
@@ -35,27 +35,17 @@ def gen_traindata(config):
         hr_wid = lr_wid * scale
         hr_hei = lr_hei * scale
 
-        hrIMG = hrIMG.crop((0, 0, hr_wid, hr_hei))
+        hrIMG = hrIMG.crop((0, 0, hr_wid, hr_hei)).convert('RGB')
+        hr = np.array(hrIMG)
+        hr = utils.rgb2ycbcr(hr).astype(np.float32)
 
-        if hrIMG.mode == 'L':
-            hr = np.array(hrIMG)
-            hr_y = hr.astype(np.float32)
-        else:
-            hrIMG.convert('RGB')
-            hr = np.array(hrIMG)
-            hr_y = utils.rgb2ycbcr(hr).astype(np.float32)[..., 0]
-
-        lr_y = imresize(hr_y, 1 / scale, method)
-        input = lr_y.astype(np.float32)
-        # residual
-        if config['residual']:
-            input_upscale = imresize(input, scale, method).astype(np.float32)
-            hr_y = hr_y - input_upscale
+        lr = imresize(hr, 1 / scale, method)
+        input = lr.astype(np.float32)
 
         for r in range(0, lr_hei - size_input + 1, stride):
             for c in range(0, lr_wid - size_input + 1, stride):
-                lr_subimgs.append(lr_y[r: r + size_input, c: c + size_input])
-                label = hr_y[r * scale: r * scale + size_label, c * scale: c * scale + size_label]
+                lr_subimgs.append(input[r: r + size_input, c: c + size_input])
+                label = hr[r * scale: r * scale + size_label, c * scale: c * scale + size_label]
                 label = label[padding: -padding, padding: -padding]
                 hr_subimgs.append(label)
 
@@ -76,15 +66,13 @@ def gen_valdata(config):
     padding = (size_label - size_output) // 2
     method = config['method']
     if config['residual']:
-        h5savepath = config["hrDir"] + f'_label={size_output}_val_FSRCNNx{scale}_res.h5'
+        h5savepath = config["hrDir"] + f'_label={size_output}_val_SRResNetx{scale}_res.h5'
     else:
-        h5savepath = config["hrDir"] + f'_label={size_output}_val_FSRCNNx{scale}.h5'
+        h5savepath = config["hrDir"] + f'_label={size_output}_val_SRResNetx{scale}.h5'
     hrDir = config["hrDir"] + '/'
     h5_file = h5py.File(h5savepath, 'w')
     lr_group = h5_file.create_group('data')
     hr_group = h5_file.create_group('label')
-    if config['residual']:
-        bic_group = h5_file.create_group('bicubic')
     imgList = os.listdir(hrDir)
     for i, imgName in enumerate(imgList):
         tpath = os.path.join(hrDir + imgName)
@@ -95,32 +83,23 @@ def gen_valdata(config):
         hr_wid = lr_wid * scale
         hr_hei = lr_hei * scale
 
-        hrIMG = hrIMG.crop((0, 0, hr_wid, hr_hei))
-        if hrIMG.mode == 'L':
-            hr_y = np.array(hrIMG).astype(np.float32)
-        else:
-            hrIMG = hrIMG.convert('RGB')
-            hr = np.array(hrIMG)
-            hr_y = utils.rgb2ycbcr(hr).astype(np.float32)[..., 0]
+        hrIMG = hrIMG.crop((0, 0, hr_wid, hr_hei)).convert('RGB')
+        hr = np.array(hrIMG)
+        hr = utils.rgb2ycbcr(hr).astype(np.float32)
 
-        lr_y = imresize(hr_y, 1 / scale, method)
-        data = lr_y.astype(np.float32)
+        lr = imresize(hr, 1 / scale, method)
+        data = lr.astype(np.float32)
         # residual
-        if config['residual']:
-            bic_y = imresize(lr_y, scale, method).astype(np.float32)
-            bic_y = bic_y[padding: -padding, padding: -padding]
-        label = hr_y.astype(np.float32)[padding: -padding, padding: -padding]
+        label = hr.astype(np.float32)[padding: -padding, padding: -padding]
 
         lr_group.create_dataset(str(i), data=data)
         hr_group.create_dataset(str(i), data=label)
-        if config['residual']:
-            bic_group.create_dataset(str(i), data=bic_y)
 
     h5_file.close()
 
 if __name__ == '__main__':
     # config = {'hrDir': './test/flower', 'scale': 3, "stride": 14, "size_input": 33, "size_label": 21}
-    config = {'hrDir': '../datasets/T91_aug', 'scale': 3, 'stride': 10, "size_input": 11, "size_output": 19, "residual": True, 'method': 'bilinear'}
+    config = {'hrDir': '../datasets/291_aug', 'scale': 4, 'stride': 12, "size_input": 24, "size_output": 96, 'method': 'bicubic'}
     gen_traindata(config)
     config['hrDir'] = '../datasets/Set5'
     gen_valdata(config)
