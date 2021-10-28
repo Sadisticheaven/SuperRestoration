@@ -59,7 +59,10 @@ def mkdirs(path):
 
 
 def calc_psnr(img1, img2):
-    return 10. * torch.log10(1. / torch.mean((img1 - img2) ** 2))
+    if isinstance(img1, torch.Tensor):
+        return 10. * torch.log10(1. / torch.mean((img1 - img2) ** 2))
+    else:
+        return 10. * np.log10(1. / np.mean((img1 - img2) ** 2))
 
 
 class AverageMeter(object):
@@ -82,11 +85,10 @@ class AverageMeter(object):
 def preprocess(img, device, image_mode='RGB'):
     if image_mode == 'RGB':
         img = np.array(img).astype(np.float32)  # (width, height, channel) -> (height, width, channel)
-        ycbcr = rgb2ycbcr(img).astype(np.float32)
-        y = ycbcr[..., 0]
-        y /= 255.
-        y = torch.from_numpy(y).to(device)  # numpy -> cpu tensor -> GPU tensor
-        y = y.unsqueeze(0).unsqueeze(0)  # input Tensor Dimension: batch_size * channel * H * W
+        ycbcr = rgb2ycbcr(img).astype(np.float32).transpose([2, 0, 1])
+        ycbcr /= 255.
+        ycbcr = torch.from_numpy(ycbcr).to(device).unsqueeze(0)  # numpy -> cpu tensor -> GPU tensor
+        y = ycbcr[0, 0, ...].unsqueeze(0).unsqueeze(0)  # input Tensor Dimension: batch_size * channel * H * W
         return y, ycbcr
     else:
         y = img.astype(np.float32)  # (width, height, channel) -> (height, width, channel)

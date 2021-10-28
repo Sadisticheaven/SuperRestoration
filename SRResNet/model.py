@@ -2,14 +2,16 @@ import math
 from torch import nn
 import torch
 padding_mode = 'replicate'
+
+
 class _Residual_Block(nn.Module):
     def __init__(self):
         super(_Residual_Block, self).__init__()
         self.conv1 = nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, padding=1, padding_mode=padding_mode)
-        self.bn1 = nn.BatchNorm2d(num_features=64, affine=True)
+        self.bn1 = nn.BatchNorm2d(num_features=64, momentum=0)
         self.prelu = nn.PReLU()
         self.conv2 = nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, padding=1, padding_mode=padding_mode)
-        self.bn2 = nn.BatchNorm2d(num_features=64, affine=True)
+        self.bn2 = nn.BatchNorm2d(num_features=64, momentum=0)
 
     def forward(self, x):
         identity = x
@@ -29,7 +31,7 @@ class G(nn.Module):
         self.prelu = nn.PReLU()
         self.resblock = self.make_layer(_Residual_Block, 16)
         self.conv2 = nn.Conv2d(64, 64, kernel_size=3, padding=1, padding_mode=padding_mode)
-        self.bn = nn.BatchNorm2d(num_features=64, affine=True)
+        self.bn = nn.BatchNorm2d(num_features=64, momentum=0)
         self.upscale4x = nn.Sequential(
             nn.Conv2d(in_channels=64, out_channels=256, kernel_size=3, padding=1, padding_mode=padding_mode),
             nn.PixelShuffle(2),

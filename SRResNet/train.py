@@ -9,6 +9,7 @@ from model import G, D
 from torch import nn, optim
 from SRResNetdatasets import SRResNetValDataset, SRResNetTrainDataset
 from torch.utils.data.dataloader import DataLoader
+import numpy as np
 # 导入Visdom类
 from visdom import Visdom
 
@@ -88,8 +89,6 @@ def train_model(config, from_pth=False, useVisdom=False):
         optimizer.load_state_dict(checkpoint['optimizer'])
         if not config['auto_lr']:
             optimizer.param_groups[0]['lr'] = lr
-            optimizer.param_groups[1]['lr'] = lr
-            optimizer.param_groups[2]['lr'] = lr * 0.1
         for state in optimizer.state.values():
             for k, v in state.items():
                 if torch.is_tensor(v):
@@ -117,53 +116,67 @@ def train_model(config, from_pth=False, useVisdom=False):
     for epoch in range(start_epoch, num_epochs):
         model.train()
         epoch_losses = utils.AverageMeter()
-        epoch_vgglosses = utils.AverageMeter()
+        # epoch_vgglosses = utils.AverageMeter()
         lr = optimizer.state_dict()['param_groups'][0]['lr']
         print(f'learning rate: {lr}\n')
         with tqdm(total=(len(train_dataset) - len(train_dataset) % batch_size)) as t:
             t.set_description(f'epoch:{epoch}/{num_epochs - 1}')
+            for data in train_dataloader:
+                inputs, labels = data
+                inputs = inputs.to(device)
+                labels = labels.to(device)
 
-            if vgg_loss:
-                for data in train_dataloader:
-                    inputs, labels = data
-                    inputs = inputs.to(device)
-                    labels = labels.to(device)
+                optimizer.zero_grad()  # 每个iteration前清除梯度
+                preds = model(inputs)
+                loss = criterion(preds, labels)
 
-                    optimizer.zero_grad()  # 每个iteration前清除梯度
-                    preds = model(inputs)
-                    loss = criterion(preds, labels)
+                loss.backward()  # 反向传播
+                epoch_losses.update(loss.item(), len(inputs))
+                optimizer.step()
 
-                    netContent.zero_grad()
-                    content_input = netContent(preds)
-                    content_target = netContent(labels)
-                    content_target = content_target.detach()
-                    content_loss = criterion(content_input, content_target) * 1/12.75
-                    content_loss.backward(retain_graph=True)
-                    epoch_vgglosses.update(content_loss.item(), len(inputs))
-
-                    loss.backward()  # 反向传播
-                    epoch_losses.update(loss.item(), len(inputs))
-                    optimizer.step()
-
-                    t.set_postfix(loss='{:.6f}'.format(epoch_losses.avg))
-                    t.set_postfix(vggloss='{:.6f}'.format(epoch_vgglosses.avg))
-                    t.update(len(inputs))
-            else:
-                for data in train_dataloader:
-                    inputs, labels = data
-                    inputs = inputs.to(device)
-                    labels = labels.to(device)
-
-                    optimizer.zero_grad()  # 每个iteration前清除梯度
-                    preds = model(inputs)
-                    loss = criterion(preds, labels)
-
-                    loss.backward()  # 反向传播
-                    epoch_losses.update(loss.item(), len(inputs))
-                    optimizer.step()
-
-                    t.set_postfix(loss='{:.6f}'.format(epoch_losses.avg))
-                    t.update(len(inputs))
+                t.set_postfix(loss='{:.6f}'.format(epoch_losses.avg))
+                t.update(len(inputs))
+            # if vgg_loss:
+            #     for data in train_dataloader:
+            #         inputs, labels = data
+            #         inputs = inputs.to(device)
+            #         labels = labels.to(device)
+            #
+            #         optimizer.zero_grad()  # 每个iteration前清除梯度
+            #         preds = model(inputs)
+            #         loss = criterion(preds, labels)
+            #
+            #         netContent.zero_grad()
+            #         content_input = netContent(preds)
+            #         content_target = netContent(labels)
+            #         content_target = content_target.detach()
+            #         content_loss = criterion(content_input, content_target) * 1/12.75
+            #         content_loss.backward(retain_graph=True)
+            #         epoch_vgglosses.update(content_loss.item(), len(inputs))
+            #
+            #         loss.backward()  # 反向传播
+            #         epoch_losses.update(loss.item(), len(inputs))
+            #         optimizer.step()
+            #
+            #         t.set_postfix(loss='{:.6f}'.format(epoch_losses.avg))
+            #         t.set_postfix(vggloss='{:.6f}'.format(epoch_vgglosses.avg))
+            #         t.update(len(inputs))
+            # else:
+            #     for data in train_dataloader:
+            #         inputs, labels = data
+            #         inputs = inputs.to(device)
+            #         labels = labels.to(device)
+            #
+            #         optimizer.zero_grad()  # 每个iteration前清除梯度
+            #         preds = model(inputs)
+            #         loss = criterion(preds, labels)
+            #
+            #         loss.backward()  # 反向传播
+            #         epoch_losses.update(loss.item(), len(inputs))
+            #         optimizer.step()
+            #
+            #         t.set_postfix(loss='{:.6f}'.format(epoch_losses.avg))
+            #         t.update(len(inputs))
 
         if useVisdom:
             draw_line(viz, X=[best_epoch], Y=[epoch_losses.avg], win='Loss', linename='trainLoss')
@@ -178,12 +191,14 @@ def train_model(config, from_pth=False, useVisdom=False):
             inputs = data[0]
             labels = data[1]
             inputs = inputs.to(device)
-            labels = labels.to(device)
 
             with torch.no_grad():
                 preds = model(inputs)
-            preds = preds.clamp(0.0, 1.0)
-            epoch_psnr.update(utils.calc_psnr(preds, labels).item(), len(inputs))
+            preds = preds.mul(255.0).cpu().numpy().squeeze(0)
+            preds = preds.transpose([1, 2, 0])  #chw->hwc
+            preds = np.clip(preds, 0.0, 255.0)
+            preds = utils.rgb2ycbcr(preds).astype(np.float32)[..., 0]/255.
+            epoch_psnr.update(utils.calc_psnr(preds, labels.numpy()[0, ...]/255.).item(), len(inputs))
         print('eval psnr: {:.2f}'.format(epoch_psnr.avg))
         if config['auto_lr']:
             scheduler.step(epoch_psnr.avg)

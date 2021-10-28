@@ -35,9 +35,7 @@ def gen_traindata(config):
             hr_hei = lr_hei * scale
 
             hrIMG = hrIMG.crop((0, 0, hr_wid, hr_hei)).convert('RGB')
-            hr = np.array(hrIMG)
-            hr = utils.rgb2ycbcr(hr).astype(np.float32)
-            # hr = hr.transpose([2, 0, 1])  # hwc->chw
+            hr = np.array(hrIMG).astype(np.float32)
 
             lr = imresize(hr, 1 / scale, method)
             input = lr.astype(np.float32)
@@ -92,14 +90,15 @@ def gen_valdata(config):
         hr_hei = lr_hei * scale
 
         hrIMG = hrIMG.crop((0, 0, hr_wid, hr_hei)).convert('RGB')
-        hr = np.array(hrIMG)
-        hr = utils.rgb2ycbcr(hr).astype(np.float32)
+        hr = np.array(hrIMG).astype(np.float32)
         # hr = hr.transpose([2, 0, 1])  # hwc->chw
 
         lr = imresize(hr, 1 / scale, method)
+        hr = utils.rgb2ycbcr(hr).astype(np.float32)
+
         data = lr.astype(np.float32).transpose([2, 0, 1])
         # residual
-        label = hr.astype(np.float32).transpose([2, 0, 1])
+        label = hr.transpose([2, 0, 1])
 
         lr_group.create_dataset(str(i), data=data)
         hr_group.create_dataset(str(i), data=label)
@@ -109,6 +108,6 @@ def gen_valdata(config):
 if __name__ == '__main__':
     # config = {'hrDir': './test/flower', 'scale': 3, "stride": 14, "size_input": 33, "size_label": 21}
     config = {'hrDir': '../datasets/291_aug', 'scale': 4, 'stride': 12, "size_input": 24, "size_output": 96, 'method': 'bicubic'}
-    gen_traindata(config)
+    #gen_traindata(config)
     config['hrDir'] = '../datasets/Set5'
     gen_valdata(config)

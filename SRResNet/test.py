@@ -2,31 +2,19 @@ import numpy as np
 import torch
 from torch.backends import cudnn
 import utils
-from model import FSRCNN, N2_10_4
+from model import G
 from PIL import Image
 from imresize import imresize
 import os
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 if __name__ == '__main__':
-    # config = {'weight_file': './weight_file/FSRCNN_x3_XavierTanh_T91_lr=e-1_batch=64_input=11/',
-    # config = {'weight_file': './weight_file/N2-10-4_x3_MSRA_G191res_lr=5e-1_batch=512_out=19/',
-    # config = {'weight_file': './weight_file/N2-10-4_x3_MSRA_T91resMod_lr=1_batch=512_out=19/',
-    # config = {'weight_file': './weight_file/Test4/N2-10-4_x3_MSRA_T91res_lr=1_batch=128_Huber=9e-1/',
-    # config = {'weight_file': './weight_file/Test4/N2-10-4_x3_MSRA_T91res_lr=e-1_batch=128_out=19/',
-    # config = {'weight_file': './weight_file/Test4/N2-10-4_x3_MSRA_T91res_lr=e-1_batch=128_CLoss=e-4/',
-    config = {'weight_file': './weight_file/Test5/N2-10-4_x3_MSRA_G191res_lr=e-2_batch=128_CLoss=e-3/',
-    # config = {'weight_file': './weight_file/FSRCNN_x3_MSRA_T91_lr=e-1_batch=128_out=27/',
-    #           'img_dir': '../datasets/BSDS200/',
-              'img_dir': '../datasets/Set14/',
-              # 'outputs_dir': './test_res/test_11-27_BSDS200/',
-              # 'outputs_dir': './test_res/test_N2-10-4-G191_Set14/',
-              'outputs_dir': './test_res/test_N2-10-4_CLoss=e-3_Set14/',
-              # 'outputs_dir': './test_res/test_XavierTanh_Set14/',
-              # 'outputs_dir': './test_res/test_191res_Set14/',
-              'in_size': 11,
-              'out_size': 27,
-              'scale': 3,
-              'residual': True,
+
+    config = {'weight_file': './',
+              'img_dir': '../datasets/Set5/',
+              'outputs_dir': './test_res/test_SRResNet_Set5/',
+              'in_size': 24,
+              'out_size': 96,
+              'scale': 4,
               'visual_filter': False
               }
 
@@ -34,12 +22,11 @@ if __name__ == '__main__':
     scale = config['scale']
     in_size = config['in_size']
     out_size = config['out_size']
-    padding = abs(in_size * scale - out_size)//2
-    # padding = scale
+    padding = scale
     # weight_file = config['weight_file'] + f'best.pth'
     # weight_file = config['weight_file'] + f'FSRCNNx3_lr=e-2_91img.pth'
-    # weight_file = config['weight_file'] + f'x{scale}/latest.pth'
-    weight_file = config['weight_file'] + f'x{scale}/best.pth'
+    weight_file = config['weight_file'] + f'latest.pth'
+    # weight_file = config['weight_file'] + f'x{scale}/best.pth'
     img_dir = config['img_dir']
     outputs_dir = outputs_dir + f'x{scale}/'
     utils.mkdirs(outputs_dir)
@@ -52,7 +39,7 @@ if __name__ == '__main__':
     cudnn.benchmark = True
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
-    model = N2_10_4(scale, in_size, out_size, d=10, m=4).to(device)
+    model = G().to(device)
     # model = FSRCNN(scale, in_size, out_size).to(device)
     checkpoint = torch.load(weight_file)
     if len(checkpoint) < 6:
@@ -84,28 +71,25 @@ if __name__ == '__main__':
 
         hr_image = hr_image[padding: -padding, padding: -padding, ...]
 
-        lr_y, _ = utils.preprocess(lr_image, device, image.mode)
-        hr_y, _ = utils.preprocess(hr_image, device, image.mode)
-        bic_y, ycbcr = utils.preprocess(bic_image, device, image.mode)
-        ycbcr = ycbcr.mul(255.0).cpu().numpy().squeeze(0).transpose([1, 2, 0])
+        # _, lr = utils.preprocess(lr_image, device, image.mode)
+        lr = np.array(lr_image).astype(np.float32).transpose([2, 0, 1])  # (width, height, channel) -> (height, width, channel)
+        lr /= 255.
+        lr = torch.from_numpy(lr).to(device).unsqueeze(0)
+
         with torch.no_grad():
-            preds = model(lr_y)
-        if config['residual']:
-            preds = preds + bic_y
-        preds = preds.clamp(0.0, 1.0)
-        # preds = preds[..., padding: -padding, padding: -padding]
-        psnr = utils.calc_psnr(hr_y, preds)
+            preds = model(lr).clamp(0.0, 1.0)
+        preds = preds[..., padding: -padding, padding: -padding]
+        preds = preds.mul(255.0).cpu().numpy().squeeze(0)
+        preds = np.clip(preds, 0.0, 255.0).transpose([1, 2, 0])
+        preds_y = utils.rgb2ycbcr(preds).astype(np.float32)[..., 0]/255.
+        hr_y = utils.rgb2ycbcr(hr_image).astype(np.float32)[..., 0]/255.
+        psnr = utils.calc_psnr(hr_y, preds_y)
         # psnr2 = utils.calc_psnr(hr_y, bic_y)
         Avg_psnr.update(psnr, 1)
         print(f'{imgName}, ' + 'PSNR: {:.2f}'.format(psnr.item()))
         # print(f'{imgName}, ' + 'PSNR_bic: {:.2f}'.format(psnr2.item()))
         # GPU tensor -> CPU tensor -> numpy
-        preds = preds.mul(255.0).cpu().numpy().squeeze(0).squeeze(0)
-        if image.mode == 'L':
-            output = np.clip(preds, 0.0, 255.0).astype(np.uint8)  # chw -> hwc
-        else:
-            output = np.array([preds, ycbcr[..., 1], ycbcr[..., 2]]).transpose([1, 2, 0]) # chw -> hwc
-            output = np.clip(utils.ycbcr2rgb(output), 0.0, 255.0).astype(np.uint8)
+        output = preds.astype(np.uint8)
         output = Image.fromarray(output) # hw -> wh
         output.save(outputs_dir + imgName.replace('.', f'_FSRCNN_x{scale}.'))
     print('Average_PSNR: {:.2f}'.format(Avg_psnr.avg))
