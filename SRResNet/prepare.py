@@ -4,6 +4,7 @@ import os
 import utils
 from PIL import Image
 from imresize import imresize
+from tqdm import tqdm
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 
 
@@ -22,27 +23,31 @@ def gen_traindata(config):
     imgList = os.listdir(hrDir)
     lr_subimgs = []
     hr_subimgs = []
-    for imgName in imgList:
-        tpath = os.path.join(hrDir + imgName)
-        hrIMG = Image.open(tpath)
+    total = len(imgList)
+    with tqdm(total=total) as t:
+        for imgName in imgList:
+            tpath = os.path.join(hrDir + imgName)
+            hrIMG = Image.open(tpath)
 
-        lr_wid = hrIMG.width // scale
-        lr_hei = hrIMG.height // scale
-        hr_wid = lr_wid * scale
-        hr_hei = lr_hei * scale
+            lr_wid = hrIMG.width // scale
+            lr_hei = hrIMG.height // scale
+            hr_wid = lr_wid * scale
+            hr_hei = lr_hei * scale
 
-        hrIMG = hrIMG.crop((0, 0, hr_wid, hr_hei)).convert('RGB')
-        hr = np.array(hrIMG)
-        hr = utils.rgb2ycbcr(hr).astype(np.float32)
+            hrIMG = hrIMG.crop((0, 0, hr_wid, hr_hei)).convert('RGB')
+            hr = np.array(hrIMG)
+            hr = utils.rgb2ycbcr(hr).astype(np.float32)
+            # hr = hr.transpose([2, 0, 1])  # hwc->chw
 
-        lr = imresize(hr, 1 / scale, method)
-        input = lr.astype(np.float32)
+            lr = imresize(hr, 1 / scale, method)
+            input = lr.astype(np.float32)
 
-        for r in range(0, lr_hei - size_input + 1, stride):
-            for c in range(0, lr_wid - size_input + 1, stride):
-                lr_subimgs.append(input[r: r + size_input, c: c + size_input])
-                label = hr[r * scale: r * scale + size_label, c * scale: c * scale + size_label]
-                hr_subimgs.append(label)
+            for r in range(0, lr_hei - size_input + 1, stride):
+                for c in range(0, lr_wid - size_input + 1, stride):
+                    lr_subimgs.append(input[r: r + size_input, c: c + size_input].transpose([2, 0, 1]))
+                    label = hr[r * scale: r * scale + size_label, c * scale: c * scale + size_label].transpose([2, 0, 1])
+                    hr_subimgs.append(label)
+            t.update(1)
 
     lr_subimgs = np.array(lr_subimgs).astype(np.float32)
     h5_file.create_dataset('data', data=lr_subimgs)
@@ -51,15 +56,15 @@ def gen_traindata(config):
     num = len(hr_subimgs)
     seg = num // scale
     hr_imgs = np.array(hr_subimgs[0: seg]).astype(np.float32)
-    dl = h5_file.create_dataset('label', data=hr_imgs, maxshape=[num, 96, 96, 3])
+    dl = h5_file.create_dataset('label', data=hr_imgs, maxshape=[num, 3, 96, 96])
     for i in range(1, scale):
         hr_imgs = []
         hr_imgs = np.array(hr_subimgs[i*seg: (i+1)*seg]).astype(np.float32)
-        dl.resize(((i+1)*seg, 96, 96, 3))
+        dl.resize(((i+1)*seg,  3, 96, 96))
         dl[i*seg:] = hr_imgs
     hr_imgs = []
     hr_imgs = np.array(hr_subimgs[scale*seg: num]).astype(np.float32)
-    dl.resize((num, 96, 96, 3))
+    dl.resize((num, 3, 96, 96))
     dl[scale*seg:] = hr_imgs
     hr_imgs = []
     h5_file.close()
@@ -89,11 +94,12 @@ def gen_valdata(config):
         hrIMG = hrIMG.crop((0, 0, hr_wid, hr_hei)).convert('RGB')
         hr = np.array(hrIMG)
         hr = utils.rgb2ycbcr(hr).astype(np.float32)
+        # hr = hr.transpose([2, 0, 1])  # hwc->chw
 
         lr = imresize(hr, 1 / scale, method)
-        data = lr.astype(np.float32)
+        data = lr.astype(np.float32).transpose([2, 0, 1])
         # residual
-        label = hr.astype(np.float32)
+        label = hr.astype(np.float32).transpose([2, 0, 1])
 
         lr_group.create_dataset(str(i), data=data)
         hr_group.create_dataset(str(i), data=label)

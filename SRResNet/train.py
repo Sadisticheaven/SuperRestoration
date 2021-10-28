@@ -5,7 +5,6 @@ import os
 import torch
 from torch.backends import cudnn
 from torchvision import models
-import torch.utils.model_zoo as model_zoo
 from model import G, D
 from torch import nn, optim
 from SRResNetdatasets import SRResNetValDataset, SRResNetTrainDataset
@@ -124,16 +123,16 @@ def train_model(config, from_pth=False, useVisdom=False):
         with tqdm(total=(len(train_dataset) - len(train_dataset) % batch_size)) as t:
             t.set_description(f'epoch:{epoch}/{num_epochs - 1}')
 
-            for data in train_dataloader:
-                inputs, labels = data
-                inputs = inputs.to(device)
-                labels = labels.to(device)
+            if vgg_loss:
+                for data in train_dataloader:
+                    inputs, labels = data
+                    inputs = inputs.to(device)
+                    labels = labels.to(device)
 
-                optimizer.zero_grad()  # 每个iteration前清除梯度
-                preds = model(inputs)
-                loss = criterion(preds, labels)
+                    optimizer.zero_grad()  # 每个iteration前清除梯度
+                    preds = model(inputs)
+                    loss = criterion(preds, labels)
 
-                if vgg_loss:
                     netContent.zero_grad()
                     content_input = netContent(preds)
                     content_target = netContent(labels)
@@ -142,14 +141,29 @@ def train_model(config, from_pth=False, useVisdom=False):
                     content_loss.backward(retain_graph=True)
                     epoch_vgglosses.update(content_loss.item(), len(inputs))
 
-                loss.backward()  # 反向传播
-                epoch_losses.update(loss.item(), len(inputs))
-                optimizer.step()
+                    loss.backward()  # 反向传播
+                    epoch_losses.update(loss.item(), len(inputs))
+                    optimizer.step()
 
-                t.set_postfix(loss='{:.6f}'.format(epoch_losses.avg))
-                if vgg_loss:
+                    t.set_postfix(loss='{:.6f}'.format(epoch_losses.avg))
                     t.set_postfix(vggloss='{:.6f}'.format(epoch_vgglosses.avg))
-                t.update(len(inputs))
+                    t.update(len(inputs))
+            else:
+                for data in train_dataloader:
+                    inputs, labels = data
+                    inputs = inputs.to(device)
+                    labels = labels.to(device)
+
+                    optimizer.zero_grad()  # 每个iteration前清除梯度
+                    preds = model(inputs)
+                    loss = criterion(preds, labels)
+
+                    loss.backward()  # 反向传播
+                    epoch_losses.update(loss.item(), len(inputs))
+                    optimizer.step()
+
+                    t.set_postfix(loss='{:.6f}'.format(epoch_losses.avg))
+                    t.update(len(inputs))
 
         if useVisdom:
             draw_line(viz, X=[best_epoch], Y=[epoch_losses.avg], win='Loss', linename='trainLoss')

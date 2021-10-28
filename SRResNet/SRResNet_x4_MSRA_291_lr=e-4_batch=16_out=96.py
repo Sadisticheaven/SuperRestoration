@@ -14,7 +14,7 @@ if __name__ == '__main__':
               'in_size': 11,
               'out_size': label_size,
               'lr': 1e-4,
-              'batch_size': 32,
+              'batch_size': 64,
               'num_epochs': 100000,
               'num_workers': 4,
               'seed': 123,
