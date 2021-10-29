@@ -77,9 +77,9 @@ def train_model(config, from_pth=False, useVisdom=False):
         {'params': deconv_weight, 'weight_decay': weight_decay, 'lr':  lr * 0.1},
         {'params': deconv_bias, 'lr': lr * 0.1},
     # optimizer = optim.SGD([
-    #     {'params': model.extract_layer.parameters()},
-    #     {'params': model.mid_part.parameters()},
-    #     {'params': model.deconv_layer.parameters(), 'lr': lr * 0.1},
+        # {'params': model.extract_layer.parameters()},
+        # {'params': model.mid_part.parameters()},
+        # {'params': model.deconv_layer.parameters(), 'lr': lr * 0.1},
     ], lr=lr, momentum=0.9)  # 前两层学习率lr， 最后一层学习率lr*0.1
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=config['step_size'], gamma=config['gamma'])
     train_dataset = T91TrainDataset(train_file)
@@ -104,10 +104,6 @@ def train_model(config, from_pth=False, useVisdom=False):
         writer = csv.writer(csv_file)
         model.load_state_dict(checkpoint['model'])
         optimizer.load_state_dict(checkpoint['optimizer'])
-        if not config['auto_lr']:
-            optimizer.param_groups[0]['lr'] = lr
-            optimizer.param_groups[1]['lr'] = lr
-            optimizer.param_groups[2]['lr'] = lr * 0.1
         for state in optimizer.state.values():
             for k, v in state.items():
                 if torch.is_tensor(v):

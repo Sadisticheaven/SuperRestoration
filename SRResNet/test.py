@@ -10,8 +10,8 @@ os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 if __name__ == '__main__':
 
     config = {'weight_file': './',
-              'img_dir': '../datasets/Set5/',
-              'outputs_dir': './test_res/test_SRResNet_Set5/',
+              'img_dir': '../datasets/Set14/',
+              'outputs_dir': './test_res/test_SRResNet_Set14/',
               'in_size': 24,
               'out_size': 96,
               'scale': 4,
@@ -23,9 +23,9 @@ if __name__ == '__main__':
     in_size = config['in_size']
     out_size = config['out_size']
     padding = scale
-    # weight_file = config['weight_file'] + f'best.pth'
+    weight_file = config['weight_file'] + f'best.pth'
+    # weight_file = config['weight_file'] + f'latest.pth'
     # weight_file = config['weight_file'] + f'FSRCNNx3_lr=e-2_91img.pth'
-    weight_file = config['weight_file'] + f'latest.pth'
     # weight_file = config['weight_file'] + f'x{scale}/best.pth'
     img_dir = config['img_dir']
     outputs_dir = outputs_dir + f'x{scale}/'
@@ -59,8 +59,7 @@ if __name__ == '__main__':
         lr_wid = image.width // scale
         lr_hei = image.height // scale
         image = image.crop((0, 0, lr_wid * scale, lr_hei * scale))
-        if image.mode != 'L':  # gray image don't need to convert
-            image = image.convert('RGB')
+        image = image.convert('RGB')
         hr_image = np.array(image)
 
         lr_image = imresize(hr_image, 1. / scale, 'bicubic')

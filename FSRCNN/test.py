@@ -13,27 +13,28 @@ if __name__ == '__main__':
     # config = {'weight_file': './weight_file/N2-10-4_x3_MSRA_T91resMod_lr=1_batch=512_out=19/',
     # config = {'weight_file': './weight_file/Test4/N2-10-4_x3_MSRA_T91res_lr=1_batch=128_Huber=9e-1/',
     # config = {'weight_file': './weight_file/Test4/N2-10-4_x3_MSRA_T91res_lr=e-1_batch=128_out=19/',
-    # config = {'weight_file': './weight_file/Test4/N2-10-4_x3_MSRA_T91res_lr=e-1_batch=128_CLoss=e-4/',
-    config = {'weight_file': './weight_file/Test5/N2-10-4_x3_MSRA_G191res_lr=e-2_batch=128_CLoss=e-3/',
+    # config = {'weight_file': './weight_file/Test5/N2-10-4_x3_MSRA_G191res_lr=e-2_batch=128_CLoss=e-3/',
+    config = {'weight_file': './weight_file/Test7/N2-10-4_x4_MSRA_G191res_lr=e-2_batch=128_CLoss=e-3/',
     # config = {'weight_file': './weight_file/FSRCNN_x3_MSRA_T91_lr=e-1_batch=128_out=27/',
     #           'img_dir': '../datasets/BSDS200/',
-              'img_dir': '../datasets/Set14/',
+              'img_dir': '../datasets/Set5/',
               # 'outputs_dir': './test_res/test_11-27_BSDS200/',
               # 'outputs_dir': './test_res/test_N2-10-4-G191_Set14/',
-              'outputs_dir': './test_res/test_N2-10-4_CLoss=e-3_Set14/',
+              'outputs_dir': './test_res/test_N2-10-4_X4_Set5/',
               # 'outputs_dir': './test_res/test_XavierTanh_Set14/',
               # 'outputs_dir': './test_res/test_191res_Set14/',
-              'in_size': 11,
-              'out_size': 27,
-              'scale': 3,
+              'in_size': 10,
+              'out_size': 32,
+              'scale': 4,
               'residual': True,
-              'visual_filter': False
+              'visual_filter': True
               }
-
+    method = 'bicubic'
     outputs_dir = config['outputs_dir']
     scale = config['scale']
     in_size = config['in_size']
     out_size = config['out_size']
+
     padding = abs(in_size * scale - out_size)//2
     # padding = scale
     # weight_file = config['weight_file'] + f'best.pth'
@@ -76,11 +77,11 @@ if __name__ == '__main__':
             image = image.convert('RGB')
         hr_image = np.array(image)
 
-        lr_image = imresize(hr_image, 1. / scale, 'bicubic')
-        bic_image = imresize(lr_image, scale, 'bicubic')
+        lr_image = imresize(hr_image, 1. / scale, method)
+        bic_image = imresize(lr_image, scale, method)
         bic_image = bic_image[padding: -padding, padding: -padding, ...]
         bic_pil = Image.fromarray(bic_image.astype(np.uint8))
-        bic_pil.save(outputs_dir + imgName.replace('.', f'_bicubic_x{scale}.'))
+        bic_pil.save(outputs_dir + imgName.replace('.', f'_{method}_x{scale}.'))
 
         hr_image = hr_image[padding: -padding, padding: -padding, ...]
 
@@ -90,10 +91,11 @@ if __name__ == '__main__':
         ycbcr = ycbcr.mul(255.0).cpu().numpy().squeeze(0).transpose([1, 2, 0])
         with torch.no_grad():
             preds = model(lr_y)
+        if scale != 3:
+            preds = preds[..., 1:, 1:]
         if config['residual']:
             preds = preds + bic_y
         preds = preds.clamp(0.0, 1.0)
-        # preds = preds[..., padding: -padding, padding: -padding]
         psnr = utils.calc_psnr(hr_y, preds)
         # psnr2 = utils.calc_psnr(hr_y, bic_y)
         Avg_psnr.update(psnr, 1)

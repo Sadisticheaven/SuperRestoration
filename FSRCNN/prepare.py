@@ -13,7 +13,11 @@ def gen_traindata(config):
     size_input = config["size_input"]
     size_label = size_input * scale
     size_output = config['size_output']
-    padding = (size_label - size_output) // 2
+    padding = abs(size_label - size_output) // 2
+    if scale == 3:
+        padding2 = padding
+    else:
+        padding2 = padding + 1
     method = config['method']
     if config['residual']:
         h5savepath = config["hrDir"] + f'_label={size_output}_train_FSRCNNx{scale}_res.h5'
@@ -56,7 +60,7 @@ def gen_traindata(config):
             for c in range(0, lr_wid - size_input + 1, stride):
                 lr_subimgs.append(lr_y[r: r + size_input, c: c + size_input])
                 label = hr_y[r * scale: r * scale + size_label, c * scale: c * scale + size_label]
-                label = label[padding: -padding, padding: -padding]
+                label = label[padding: -padding2, padding: -padding2]
                 hr_subimgs.append(label)
 
     lr_subimgs = np.array(lr_subimgs).astype(np.float32)
@@ -75,6 +79,10 @@ def gen_valdata(config):
     size_output = config['size_output']
     padding = (size_label - size_output) // 2
     method = config['method']
+    if scale == 3:
+        padding2 = padding
+    else:
+        padding2 = padding + 1
     if config['residual']:
         h5savepath = config["hrDir"] + f'_label={size_output}_val_FSRCNNx{scale}_res.h5'
     else:
@@ -108,8 +116,8 @@ def gen_valdata(config):
         # residual
         if config['residual']:
             bic_y = imresize(lr_y, scale, method).astype(np.float32)
-            bic_y = bic_y[padding: -padding, padding: -padding]
-        label = hr_y.astype(np.float32)[padding: -padding, padding: -padding]
+            bic_y = bic_y[padding: -padding2, padding: -padding2]
+        label = hr_y.astype(np.float32)[padding: -padding2, padding: -padding2]
 
         lr_group.create_dataset(str(i), data=data)
         hr_group.create_dataset(str(i), data=label)
@@ -120,7 +128,7 @@ def gen_valdata(config):
 
 if __name__ == '__main__':
     # config = {'hrDir': './test/flower', 'scale': 3, "stride": 14, "size_input": 33, "size_label": 21}
-    config = {'hrDir': '../datasets/T91_aug', 'scale': 3, 'stride': 10, "size_input": 11, "size_output": 19, "residual": True, 'method': 'bilinear'}
+    config = {'hrDir': '../datasets/T91_aug', 'scale': 4, 'stride': 10, "size_input": 10, "size_output": 21, "residual": True, 'method': 'bicubic'}
     gen_traindata(config)
     config['hrDir'] = '../datasets/Set5'
     gen_valdata(config)

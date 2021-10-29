@@ -4,15 +4,13 @@ import utils
 import os
 import torch
 from torch.backends import cudnn
-from torchvision import models
-from model import G, D
 from torch import nn, optim
-from SRResNetdatasets import SRResNetValDataset, SRResNetTrainDataset
+from model import N2_10_4, CLoss, HuberLoss, FSRCNN
+from FSRCNNdatasets import T91TrainDataset, T91ValDataset, T91ResValDataset
 from torch.utils.data.dataloader import DataLoader
-import numpy as np
 # 导入Visdom类
 from visdom import Visdom
-os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
+
 
 def draw_line(viz, X, Y, win, linename):
     viz.line(Y=Y,
@@ -22,17 +20,16 @@ def draw_line(viz, X, Y, win, linename):
              name=linename)
 
 
-def train_model(config, from_pth=False, useVisdom=False):
+def train_model(config, from_pth=False, pre_train=None, useVisdom=False):
     os.environ['CUDA_VISIBLE_DEVICES'] = config['Gpu']
     if useVisdom:
-        viz = Visdom(env='SRResNet')
+        viz = Visdom(env='FSRCNN')
     train_file = config['train_file']
     val_file = config['val_file']
     outputs_dir = config['outputs_dir']
     scale = config['scale']
     in_size = config['in_size']
     out_size = config['out_size']
-    lr = config['lr']
     batch_size = config['batch_size']
     num_epochs = config['num_epochs']
     num_workers = config['num_workers']
@@ -40,42 +37,42 @@ def train_model(config, from_pth=False, useVisdom=False):
     weight_file = config['weight_file']
     utils.mkdirs(outputs_dir)
     csv_file = outputs_dir + config['csv_name']
-    vgg_loss = config['vgg_loss']
+
+    lr = config['lr']
+    gradient_clip = config['gradient_clip']
+    weight_decay = config['weight_decay']
 
     cudnn.benchmark = True
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     torch.manual_seed(seed)
-    # torch.cuda.manual_seed(seed)
     # ----需要修改部分------
-    print("===> Loading datasets")
-    train_dataset = SRResNetTrainDataset(train_file)
-    train_dataloader = DataLoader(dataset=train_dataset, num_workers=num_workers,
-                                  batch_size=batch_size, shuffle=True, pin_memory=True)
-    val_dataset = SRResNetValDataset(val_file)
-    val_dataloader = DataLoader(dataset=val_dataset, batch_size=1)
-    if vgg_loss:
-        print('===> Loading VGG model')
-        netVGG = models.vgg19()
-        netVGG.load_state_dict('./VGG19/vgg19-dcbb9e9d.pth')
-
-        class _content_model(nn.Module):
-            def __init__(self):
-                super(_content_model, self).__init__()
-                self.feature = nn.Sequential(*list(netVGG.features.children())[:-1])
-
-            def forward(self, x):
-                out = self.feature(x)
-                return out
-
-        netContent = _content_model().cuda()
-
-    print("===> Building model")
-    model = G()
+    model = N2_10_4(scale, in_size, out_size, num_channels=1, d=config['d'], m=config['m'])
+    # model = FSRCNN(scale, in_size, out_size, num_channels=1, d=config['d'], m=config['m'])
     if not from_pth:
-        model.init_weight()
-    criterion = nn.MSELoss().cuda()
-    optimizer = optim.Adam(model.parameters(), lr=lr)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', patience=50)
+        model.init_weights(method=config['init'])
+
+    if config['Loss'] == 'CLoss':
+        criterion = CLoss(delta=config['delta']).cuda()
+    elif config['Loss'] == 'Huber':
+        criterion = HuberLoss(delta=config['delta']).cuda()
+    else:
+        criterion = nn.MSELoss().cuda()
+
+    optimizer = optim.SGD([
+        {'params': model.deconv_layer.parameters(), 'lr': lr},
+    ], lr=lr, momentum=0.9)  # 前两层学习率lr， 最后一层学习率lr*0.1
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=config['step_size'], gamma=config['gamma'])
+    train_dataset = T91TrainDataset(train_file)
+    train_dataloader = DataLoader(dataset=train_dataset,
+                                  batch_size=batch_size,
+                                  shuffle=True,
+                                  num_workers=num_workers,
+                                  pin_memory=True)
+    if config['residual']:
+        val_dataset = T91ResValDataset(val_file)
+    else:
+        val_dataset = T91ValDataset(val_file)
+    val_dataloader = DataLoader(dataset=val_dataset, batch_size=1)
     # ----END------
 
     if from_pth:
@@ -87,8 +84,6 @@ def train_model(config, from_pth=False, useVisdom=False):
         writer = csv.writer(csv_file)
         model.load_state_dict(checkpoint['model'])
         optimizer.load_state_dict(checkpoint['optimizer'])
-        if not config['auto_lr']:
-            optimizer.param_groups[0]['lr'] = lr
         for state in optimizer.state.values():
             for k, v in state.items():
                 if torch.is_tensor(v):
@@ -101,6 +96,13 @@ def train_model(config, from_pth=False, useVisdom=False):
             draw_line(viz, X=[best_epoch], Y=[checkpoint['loss']], win='Loss', linename='trainLoss')
             draw_line(viz, X=[best_epoch], Y=[best_psnr], win='PSNR', linename='valPSNR')
     else:
+        if not os.path.exists(pre_train):
+            print(f'Weight file not exist!\n{pre_train}\n')
+            raise "Error"
+        checkpoint = torch.load(pre_train)
+        model.load_state_dict(checkpoint['model'])
+        model.deconv_layer.weight.data.normal_(mean=0.0, std=0.001)
+        model.deconv_layer.bias.data.zero_()
         csv_file = open(csv_file, 'w', newline='')
         writer = csv.writer(csv_file)
         writer.writerow(('epoch', 'loss', 'psnr'))
@@ -116,11 +118,11 @@ def train_model(config, from_pth=False, useVisdom=False):
     for epoch in range(start_epoch, num_epochs):
         model.train()
         epoch_losses = utils.AverageMeter()
-        # epoch_vgglosses = utils.AverageMeter()
         lr = optimizer.state_dict()['param_groups'][0]['lr']
         print(f'learning rate: {lr}\n')
         with tqdm(total=(len(train_dataset) - len(train_dataset) % batch_size)) as t:
             t.set_description(f'epoch:{epoch}/{num_epochs - 1}')
+
             for data in train_dataloader:
                 inputs, labels = data
                 inputs = inputs.to(device)
@@ -129,61 +131,20 @@ def train_model(config, from_pth=False, useVisdom=False):
                 optimizer.zero_grad()  # 每个iteration前清除梯度
                 preds = model(inputs)
                 loss = criterion(preds, labels)
+                epoch_losses.update(loss.item(), len(inputs))
 
                 loss.backward()  # 反向传播
-                epoch_losses.update(loss.item(), len(inputs))
+                # torch.nn.utils.clip_grad_value_(model.parameters(), gradient_clip)
                 optimizer.step()
 
                 t.set_postfix(loss='{:.6f}'.format(epoch_losses.avg))
                 t.update(len(inputs))
-            # if vgg_loss:
-            #     for data in train_dataloader:
-            #         inputs, labels = data
-            #         inputs = inputs.to(device)
-            #         labels = labels.to(device)
-            #
-            #         optimizer.zero_grad()  # 每个iteration前清除梯度
-            #         preds = model(inputs)
-            #         loss = criterion(preds, labels)
-            #
-            #         netContent.zero_grad()
-            #         content_input = netContent(preds)
-            #         content_target = netContent(labels)
-            #         content_target = content_target.detach()
-            #         content_loss = criterion(content_input, content_target) * 1/12.75
-            #         content_loss.backward(retain_graph=True)
-            #         epoch_vgglosses.update(content_loss.item(), len(inputs))
-            #
-            #         loss.backward()  # 反向传播
-            #         epoch_losses.update(loss.item(), len(inputs))
-            #         optimizer.step()
-            #
-            #         t.set_postfix(loss='{:.6f}'.format(epoch_losses.avg))
-            #         t.set_postfix(vggloss='{:.6f}'.format(epoch_vgglosses.avg))
-            #         t.update(len(inputs))
-            # else:
-            #     for data in train_dataloader:
-            #         inputs, labels = data
-            #         inputs = inputs.to(device)
-            #         labels = labels.to(device)
-            #
-            #         optimizer.zero_grad()  # 每个iteration前清除梯度
-            #         preds = model(inputs)
-            #         loss = criterion(preds, labels)
-            #
-            #         loss.backward()  # 反向传播
-            #         epoch_losses.update(loss.item(), len(inputs))
-            #         optimizer.step()
-            #
-            #         t.set_postfix(loss='{:.6f}'.format(epoch_losses.avg))
-            #         t.update(len(inputs))
 
         if useVisdom:
             draw_line(viz, X=[best_epoch], Y=[epoch_losses.avg], win='Loss', linename='trainLoss')
 
         if isinstance(model, torch.nn.DataParallel):
             model = model.module
-        # torch.save(model.state_dict(), outputs_dir + f'epoch_{epoch}.pth')
 
         model.eval()
         epoch_psnr = utils.AverageMeter()
@@ -191,17 +152,20 @@ def train_model(config, from_pth=False, useVisdom=False):
             inputs = data[0]
             labels = data[1]
             inputs = inputs.to(device)
+            labels = labels.to(device)
+            if config['residual']:
+                bicubic = data[2]
+                bicubic = bicubic.to(device)
 
             with torch.no_grad():
                 preds = model(inputs)
-            preds = preds.mul(255.0).cpu().numpy().squeeze(0)
-            preds = preds.transpose([1, 2, 0])  #chw->hwc
-            preds = np.clip(preds, 0.0, 255.0)
-            preds = utils.rgb2ycbcr(preds).astype(np.float32)[..., 0]/255.
-            epoch_psnr.update(utils.calc_psnr(preds, labels.numpy()[0, 0, ...]).item(), len(inputs))
+            if config['residual']:
+                preds = preds + bicubic
+            preds = preds.clamp(0.0, 1.0)
+            epoch_psnr.update(utils.calc_psnr(preds, labels).item(), len(inputs))
         print('eval psnr: {:.2f}'.format(epoch_psnr.avg))
         if config['auto_lr']:
-            scheduler.step(epoch_psnr.avg)
+            scheduler.step()
         state = {'model': model.state_dict(), 'optimizer': optimizer.state_dict(), 'epoch': epoch,
                  'loss': epoch_losses.avg, 'psnr': epoch_psnr.avg}
         torch.save(state, outputs_dir + f'latest.pth')
