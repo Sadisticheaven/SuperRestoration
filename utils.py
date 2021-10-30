@@ -1,12 +1,10 @@
 # PyTorch
 import copy
-
 import torch
-from torchvision.transforms import transforms
 import matplotlib.pyplot as plt
-from matplotlib.pyplot import figure
 import numpy as np
 import os
+from PIL import Image
 
 
 def mkdirs(path):
@@ -14,23 +12,36 @@ def mkdirs(path):
         os.makedirs(path)
 
 
-def loadIMG(img_path,):
-    hrIMG = Image.open(img_path)
+def draw_line(viz, X, Y, win, linename):
+    viz.line(Y=Y,
+             X=X,
+             win=win,
+             update='append',
+             name=linename)
 
+
+def loadIMG_crop(img_path, scale):
+    """load img and Crop to an integer multiple of scale"""
+    hrIMG = Image.open(img_path)
     lr_wid = hrIMG.width // scale
     lr_hei = hrIMG.height // scale
     hr_wid = lr_wid * scale
     hr_hei = lr_hei * scale
-
     hrIMG = hrIMG.crop((0, 0, hr_wid, hr_hei))
+    return hrIMG
 
-    if hrIMG.mode == 'L':
+
+def img2ycbcr(hrIMG, gray2rgb=False):
+    """if gray and not convert it to rgb, return 1 channel"""
+    if not gray2rgb and hrIMG.mode == 'L':
         hr = np.array(hrIMG)
         hr = hr.astype(np.float32)
     else:
         hrIMG.convert('RGB')
-        hr = np.array(hrIMG)
-        hr = utils.rgb2ycbcr(hr).astype(np.float32)[..., 0]
+        hr = np.array(hrIMG)  # whc -> hwc
+        hr = rgb2ycbcr(hr).astype(np.float32)
+    return hr
+
 
 def calc_psnr(img1, img2):
     if isinstance(img1, torch.Tensor):
@@ -86,9 +97,9 @@ def viz_layer(layer, n_filters=4):
         plt.subplot(8, 8, index + 1)
         # min = torch.min(filter).item()
         # max = torch.max(filter).item()
-        filter = (filter - min)/(max - min)
+        filter = (filter - min) / (max - min)
         # plt.imshow(transforms1(filter.detach())[0, :, :],  cmap='gray')
-        plt.imshow(filter[0, :, :].detach(),  cmap='gray')
+        plt.imshow(filter[0, :, :].detach(), cmap='gray')
         plt.axis('off')
     plt.show()
 
@@ -107,37 +118,38 @@ def viz_layer2(layer, n_filters=4):
         plt.subplot(8, 8, index + 1)
         # filter = (filter - min)/(max - min)
         # plt.imshow(transforms1(filter.detach())[0, :, :],  cmap='gray')
-        plt.imshow(filter[:, :].detach(),  cmap='gray')
+        plt.imshow(filter[:, :].detach(), cmap='gray')
         plt.axis('off')
     plt.show()
 
 
 def rgb2ycbcr(rgb):
-    m = np.array([[ 65.481, 128.553, 24.966],
+    m = np.array([[65.481, 128.553, 24.966],
                   [-37.797, -74.203, 112.0],
-                  [ 112.0, -93.786, -18.214]])
+                  [112.0, -93.786, -18.214]])
     shape = rgb.shape
     if len(shape) == 3:
         rgb = rgb.reshape((shape[0] * shape[1], 3))
     ycbcr = np.dot(rgb, m.transpose() / 255.)
-    ycbcr[:,0] += 16.
-    ycbcr[:,1:] += 128.
+    ycbcr[:, 0] += 16.
+    ycbcr[:, 1:] += 128.
     ycbcr = np.round(ycbcr)
     return ycbcr.reshape(shape)
+
 
 # ITU-R BT.601
 # https://en.wikipedia.org/wiki/YCbCr
 # YUV -> RGB
 def ycbcr2rgb(ycbcr):
-    m = np.array([[ 65.481, 128.553, 24.966],
+    m = np.array([[65.481, 128.553, 24.966],
                   [-37.797, -74.203, 112],
-                  [ 112, -93.786, -18.214]])
+                  [112, -93.786, -18.214]])
     shape = ycbcr.shape
     if len(shape) == 3:
         ycbcr = ycbcr.reshape((shape[0] * shape[1], 3))
     rgb = copy.deepcopy(ycbcr)
-    rgb[:,0] -= 16.
-    rgb[:,1:] -= 128.
+    rgb[:, 0] -= 16.
+    rgb[:, 1:] -= 128.
     rgb = np.dot(rgb, np.linalg.inv(m.transpose()) * 255.)
     rgb = np.round(rgb)
     return rgb.clip(0, 255).reshape(shape)

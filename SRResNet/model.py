@@ -7,11 +7,11 @@ padding_mode = 'replicate'
 class _Residual_Block(nn.Module):
     def __init__(self):
         super(_Residual_Block, self).__init__()
-        self.conv1 = nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, padding=1, padding_mode=padding_mode)
-        self.bn1 = nn.BatchNorm2d(num_features=64, momentum=0)
+        self.conv1 = nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, padding=1, padding_mode=padding_mode, bias=False)
+        self.bn1 = nn.BatchNorm2d(num_features=64)
         self.prelu = nn.PReLU()
-        self.conv2 = nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, padding=1, padding_mode=padding_mode)
-        self.bn2 = nn.BatchNorm2d(num_features=64, momentum=0)
+        self.conv2 = nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, padding=1, padding_mode=padding_mode, bias=False)
+        self.bn2 = nn.BatchNorm2d(num_features=64)
 
     def forward(self, x):
         identity = x
@@ -27,20 +27,20 @@ class _Residual_Block(nn.Module):
 class G(nn.Module):
     def __init__(self):
         super(G, self).__init__()
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=9, padding=4, padding_mode=padding_mode)
+        self.conv1 = nn.Conv2d(3, 64, kernel_size=9, padding=4, padding_mode=padding_mode, bias=False)
         self.prelu = nn.PReLU()
         self.resblock = self.make_layer(_Residual_Block, 16)
-        self.conv2 = nn.Conv2d(64, 64, kernel_size=3, padding=1, padding_mode=padding_mode)
-        self.bn = nn.BatchNorm2d(num_features=64, momentum=0)
+        self.conv2 = nn.Conv2d(64, 64, kernel_size=3, padding=1, padding_mode=padding_mode, bias=False)
+        self.bn = nn.BatchNorm2d(num_features=64)
         self.upscale4x = nn.Sequential(
-            nn.Conv2d(in_channels=64, out_channels=256, kernel_size=3, padding=1, padding_mode=padding_mode),
+            nn.Conv2d(in_channels=64, out_channels=256, kernel_size=3, padding=1, padding_mode=padding_mode, bias=False),
             nn.PixelShuffle(2),
             nn.PReLU(),
-            nn.Conv2d(in_channels=64, out_channels=256, kernel_size=3, padding=1, padding_mode=padding_mode),
+            nn.Conv2d(in_channels=64, out_channels=256, kernel_size=3, padding=1, padding_mode=padding_mode, bias=False),
             nn.PixelShuffle(2),
             nn.PReLU()
         )
-        self.conv3 = nn.Conv2d(64, 3, kernel_size=9, padding=4, padding_mode=padding_mode)
+        self.conv3 = nn.Conv2d(64, 3, kernel_size=9, padding=4, padding_mode=padding_mode, bias=False)
 
     def make_layer(self, block, num_of_layer):
         layers = []

@@ -54,11 +54,7 @@ if __name__ == '__main__':
     imglist = os.listdir(img_dir)
     Avg_psnr = utils.AverageMeter()
     for imgName in imglist:
-        img_file = img_dir + imgName
-        image = Image.open(img_file)  # (width, height)
-        lr_wid = image.width // scale
-        lr_hei = image.height // scale
-        image = image.crop((0, 0, lr_wid * scale, lr_hei * scale))
+        image = utils.loadIMG_crop(img_dir + imgName, scale)
         image = image.convert('RGB')
         hr_image = np.array(image)
 
@@ -71,24 +67,22 @@ if __name__ == '__main__':
         hr_image = hr_image[padding: -padding, padding: -padding, ...]
 
         # _, lr = utils.preprocess(lr_image, device, image.mode)
-        lr = np.array(lr_image).astype(np.float32).transpose([2, 0, 1])  # (width, height, channel) -> (height, width, channel)
+        lr = np.array(lr_image).astype(np.float32).transpose([2, 0, 1])  # whc -> hwc -> chw
         lr /= 255.
         lr = torch.from_numpy(lr).to(device).unsqueeze(0)
 
         with torch.no_grad():
-            preds = model(lr).clamp(0.0, 1.0)
-        preds = preds[..., padding: -padding, padding: -padding]
-        preds = preds.mul(255.0).cpu().numpy().squeeze(0)
-        preds = np.clip(preds, 0.0, 255.0).transpose([1, 2, 0])
-        preds_y = utils.rgb2ycbcr(preds).astype(np.float32)[..., 0]/255.
+            SR = model(lr).clamp(0.0, 1.0)
+        SR = SR[..., padding: -padding, padding: -padding]
+        SR = SR.mul(255.0).cpu().numpy().squeeze(0)
+        SR = np.clip(SR, 0.0, 255.0).transpose([1, 2, 0])
+        SR_y = utils.rgb2ycbcr(SR).astype(np.float32)[..., 0] / 255.
         hr_y = utils.rgb2ycbcr(hr_image).astype(np.float32)[..., 0]/255.
-        psnr = utils.calc_psnr(hr_y, preds_y)
-        # psnr2 = utils.calc_psnr(hr_y, bic_y)
+        psnr = utils.calc_psnr(hr_y, SR_y)
         Avg_psnr.update(psnr, 1)
         print(f'{imgName}, ' + 'PSNR: {:.2f}'.format(psnr.item()))
-        # print(f'{imgName}, ' + 'PSNR_bic: {:.2f}'.format(psnr2.item()))
         # GPU tensor -> CPU tensor -> numpy
-        output = preds.astype(np.uint8)
+        output = SR.astype(np.uint8)
         output = Image.fromarray(output) # hw -> wh
-        output.save(outputs_dir + imgName.replace('.', f'_FSRCNN_x{scale}.'))
+        output.save(outputs_dir + imgName.replace('.', f'_SRResNet_x{scale}.'))
     print('Average_PSNR: {:.2f}'.format(Avg_psnr.avg))

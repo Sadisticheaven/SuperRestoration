@@ -2,6 +2,7 @@ import math
 from torch import nn
 import torch
 
+
 class FSRCNN(nn.Module):
     def __init__(self, scale_factor, in_size, out_size, num_channels=1, d=56, s=12, m=4):
         super(FSRCNN, self).__init__()
@@ -22,33 +23,9 @@ class FSRCNN(nn.Module):
 
     def init_weights(self, method='MSRA'):
         if method == 'MSRA':
-            self._init_weights_MSRA()
+            init_weights_MSRA(self)
         else:
-            self._init_weights_Xavier()
-
-    def _init_weights_MSRA(self):
-        for L in self.extract_layer:
-            if isinstance(L, nn.Conv2d):
-                L.weight.data.normal_(mean=0.0, std=math.sqrt(2 / (L.out_channels * L.weight.data[0][0].numel())))
-                L.bias.data.zero_()
-        for L in self.mid_part:
-            if isinstance(L, nn.Conv2d):
-                L.weight.data.normal_(mean=0.0, std=math.sqrt(2 / (L.out_channels * L.weight.data[0][0].numel())))
-                L.bias.data.zero_()
-        self.deconv_layer.weight.data.normal_(mean=0.0, std=0.001)
-        self.deconv_layer.bias.data.zero_()
-
-    def _init_weights_Xavier(self):
-        for L in self.extract_layer:
-            if isinstance(L, nn.Conv2d):
-                L.weight.data.normal_(mean=0.0, std=math.sqrt(2 / (L.out_channels + L.in_channels)))
-                L.bias.data.zero_()
-        for L in self.mid_part:
-            if isinstance(L, nn.Conv2d):
-                L.weight.data.normal_(mean=0.0, std=math.sqrt(2 / (L.out_channels + L.in_channels)))
-                L.bias.data.zero_()
-        self.deconv_layer.weight.data.normal_(mean=0.0, std=0.001)
-        self.deconv_layer.bias.data.zero_()
+            init_weights_Xavier(self)
 
     def forward(self, x):
         x = self.extract_layer(x)
@@ -80,38 +57,13 @@ class N2_10_4(nn.Module):
 
     def init_weights(self, method='MSRA'):
         if method == 'MSRA':
-            self._init_weights_MSRA()
+            init_weights_MSRA(self)
         else:
-            self._init_weights_Xavier()
-
-    def _init_weights_MSRA(self):
-        for L in self.extract_layer:
-            if isinstance(L, nn.Conv2d):
-                L.weight.data.normal_(mean=0.0, std=math.sqrt(2 / (L.out_channels * L.weight.data[0][0].numel())))
-                L.bias.data.zero_()
-        for L in self.mid_part:
-            if isinstance(L, nn.Conv2d):
-                L.weight.data.normal_(mean=0.0, std=math.sqrt(2 / (L.out_channels * L.weight.data[0][0].numel())))
-                L.bias.data.zero_()
-        self.deconv_layer.weight.data.normal_(mean=0.0, std=0.001)
-        self.deconv_layer.bias.data.zero_()
-
-    def _init_weights_Xavier(self):
-        for L in self.extract_layer:
-            if isinstance(L, nn.Conv2d):
-                L.weight.data.normal_(mean=0.0, std=math.sqrt(2 / (L.out_channels + L.in_channels)))
-                L.bias.data.zero_()
-        for L in self.mid_part:
-            if isinstance(L, nn.Conv2d):
-                L.weight.data.normal_(mean=0.0, std=math.sqrt(2 / (L.out_channels + L.in_channels)))
-                L.bias.data.zero_()
-        self.deconv_layer.weight.data.normal_(mean=0.0, std=0.001)
-        self.deconv_layer.bias.data.zero_()
+            init_weights_Xavier(self)
 
 
 class CLoss(nn.Module):
     """L1 Charbonnierloss."""
-
     def __init__(self, delta=1e-3):
         super(CLoss, self).__init__()
         self.delta2 = delta * delta
@@ -122,9 +74,9 @@ class CLoss(nn.Module):
         loss = torch.mean(error)
         return loss
 
+
 class HuberLoss(nn.Module):
     """Huber loss."""
-
     def __init__(self, delta=2e-4):
         super(HuberLoss, self).__init__()
         self.delta = delta
@@ -138,3 +90,28 @@ class HuberLoss(nn.Module):
         error = torch.where(cond, large_loss, small_loss)
         loss = torch.mean(error)
         return loss
+
+
+def init_weights_MSRA(Model):
+    for L in Model.extract_layer:
+        if isinstance(L, nn.Conv2d):
+            L.weight.data.normal_(mean=0.0, std=math.sqrt(2 / (L.out_channels * L.weight.data[0][0].numel())))
+            L.bias.data.zero_()
+    for L in Model.mid_part:
+        if isinstance(L, nn.Conv2d):
+            L.weight.data.normal_(mean=0.0, std=math.sqrt(2 / (L.out_channels * L.weight.data[0][0].numel())))
+            L.bias.data.zero_()
+    Model.deconv_layer.weight.data.normal_(mean=0.0, std=0.001)
+    Model.deconv_layer.bias.data.zero_()
+
+def init_weights_Xavier(Model):
+    for L in Model.extract_layer:
+        if isinstance(L, nn.Conv2d):
+            L.weight.data.normal_(mean=0.0, std=math.sqrt(2 / (L.out_channels + L.in_channels)))
+            L.bias.data.zero_()
+    for L in Model.mid_part:
+        if isinstance(L, nn.Conv2d):
+            L.weight.data.normal_(mean=0.0, std=math.sqrt(2 / (L.out_channels + L.in_channels)))
+            L.bias.data.zero_()
+    Model.deconv_layer.weight.data.normal_(mean=0.0, std=0.001)
+    Model.deconv_layer.bias.data.zero_()

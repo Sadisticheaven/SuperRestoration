@@ -5,8 +5,8 @@ if __name__ == '__main__':
     program = os.path.basename(sys.argv[0]).split('.')[0]
     scale = 3
     label_size = 19
-    config = {'train_file': f'../datasets/T91_aug_label={label_size}_train_FSRCNNx{scale}.h5',
-              'val_file': f'../datasets/Set5_label={label_size}_val_FSRCNNx{scale}.h5',
+    config = {'train_file': f'../datasets/T91_aug_label={label_size}_train_FSRCNNx{scale}_res.h5',
+              'val_file': f'../datasets/Set5_label={label_size}_val_FSRCNNx{scale}_res.h5',
               'outputs_dir': f'./weight_file/{program}/x{scale}/',
               'csv_name': f'{program}.csv',
               'weight_file': f'./weight_file/{program}/x{scale}/latest.pth',
@@ -23,7 +23,8 @@ if __name__ == '__main__':
               'seed': 123,
               'init': 'MSRA',
               'Gpu': '0',
-              'auto_lr': False
+              'auto_lr': False,
+              'residual': True
               }
 
-    train_model(config, from_pth=False, useVisdom=False)
+    train_model(config, from_pth=True, useVisdom=True)

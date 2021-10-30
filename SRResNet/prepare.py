@@ -2,7 +2,6 @@ import numpy as np
 import h5py
 import os
 import utils
-from PIL import Image
 from imresize import imresize
 from tqdm import tqdm
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
@@ -18,7 +17,6 @@ def gen_traindata(config):
     h5savepath = config["hrDir"] + f'_label={size_output}_train_SRResNetx{scale}.h5'
     hrDir = config["hrDir"] + '/'
 
-
     h5_file = h5py.File(h5savepath, 'w')
     imgList = os.listdir(hrDir)
     lr_subimgs = []
@@ -26,23 +24,14 @@ def gen_traindata(config):
     total = len(imgList)
     with tqdm(total=total) as t:
         for imgName in imgList:
-            tpath = os.path.join(hrDir + imgName)
-            hrIMG = Image.open(tpath)
-
-            lr_wid = hrIMG.width // scale
-            lr_hei = hrIMG.height // scale
-            hr_wid = lr_wid * scale
-            hr_hei = lr_hei * scale
-
-            hrIMG = hrIMG.crop((0, 0, hr_wid, hr_hei)).convert('RGB')
-            hr = np.array(hrIMG).astype(np.float32)
-
+            hrIMG = utils.loadIMG_crop(hrDir + imgName, scale)
+            hr = utils.img2ycbcr(hrIMG, gray2rgb=True)
             lr = imresize(hr, 1 / scale, method)
             input = lr.astype(np.float32)
 
-            for r in range(0, lr_hei - size_input + 1, stride):
-                for c in range(0, lr_wid - size_input + 1, stride):
-                    lr_subimgs.append(input[r: r + size_input, c: c + size_input].transpose([2, 0, 1]))
+            for r in range(0, lr.shape[0] - size_input + 1, stride):  # height
+                for c in range(0, lr.shape[1] - size_input + 1, stride):  # width
+                    lr_subimgs.append(input[r: r + size_input, c: c + size_input].transpose([2, 0, 1]))  # hwc -> chw
                     label = hr[r * scale: r * scale + size_label, c * scale: c * scale + size_label].transpose([2, 0, 1])
                     hr_subimgs.append(label)
             t.update(1)
@@ -81,29 +70,19 @@ def gen_valdata(config):
     hr_group = h5_file.create_group('label')
     imgList = os.listdir(hrDir)
     for i, imgName in enumerate(imgList):
-        tpath = os.path.join(hrDir + imgName)
-        hrIMG = Image.open(tpath)
-
-        lr_wid = hrIMG.width // scale
-        lr_hei = hrIMG.height // scale
-        hr_wid = lr_wid * scale
-        hr_hei = lr_hei * scale
-
-        hrIMG = hrIMG.crop((0, 0, hr_wid, hr_hei)).convert('RGB')
-        hr = np.array(hrIMG).astype(np.float32)
-        # hr = hr.transpose([2, 0, 1])  # hwc->chw
+        hrIMG = utils.loadIMG_crop(hrDir + imgName, scale)
+        hr = utils.img2ycbcr(hrIMG, gray2rgb=True)
 
         lr = imresize(hr, 1 / scale, method)
         hr = utils.rgb2ycbcr(hr).astype(np.float32)
 
         data = lr.astype(np.float32).transpose([2, 0, 1])
-        # residual
         label = hr.transpose([2, 0, 1])
 
         lr_group.create_dataset(str(i), data=data)
         hr_group.create_dataset(str(i), data=label)
-
     h5_file.close()
+
 
 if __name__ == '__main__':
     # config = {'hrDir': './test/flower', 'scale': 3, "stride": 14, "size_input": 33, "size_label": 21}

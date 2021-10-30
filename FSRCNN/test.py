@@ -26,6 +26,8 @@ if __name__ == '__main__':
               'in_size': 10,
               'out_size': 32,
               'scale': 4,
+              'd': 10,
+              'm': 4,
               'residual': True,
               'visual_filter': True
               }
@@ -53,7 +55,7 @@ if __name__ == '__main__':
     cudnn.benchmark = True
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
-    model = N2_10_4(scale, in_size, out_size, d=10, m=4).to(device)
+    model = N2_10_4(scale, in_size, out_size, config['d'], config['m']).to(device)
     # model = FSRCNN(scale, in_size, out_size).to(device)
     checkpoint = torch.load(weight_file)
     if len(checkpoint) < 6:
@@ -68,11 +70,7 @@ if __name__ == '__main__':
     imglist = os.listdir(img_dir)
     Avg_psnr = utils.AverageMeter()
     for imgName in imglist:
-        img_file = img_dir + imgName
-        image = Image.open(img_file)  # (width, height)
-        lr_wid = image.width // scale
-        lr_hei = image.height // scale
-        image = image.crop((0, 0, lr_wid * scale, lr_hei * scale))
+        image = utils.loadIMG_crop(img_dir + imgName, scale)
         if image.mode != 'L':  # gray image don't need to convert
             image = image.convert('RGB')
         hr_image = np.array(image)
@@ -88,25 +86,23 @@ if __name__ == '__main__':
         lr_y, _ = utils.preprocess(lr_image, device, image.mode)
         hr_y, _ = utils.preprocess(hr_image, device, image.mode)
         bic_y, ycbcr = utils.preprocess(bic_image, device, image.mode)
-        ycbcr = ycbcr.mul(255.0).cpu().numpy().squeeze(0).transpose([1, 2, 0])
         with torch.no_grad():
-            preds = model(lr_y)
+            SR = model(lr_y)
         if scale != 3:
-            preds = preds[..., 1:, 1:]
+            SR = SR[..., 1:, 1:]
         if config['residual']:
-            preds = preds + bic_y
-        preds = preds.clamp(0.0, 1.0)
-        psnr = utils.calc_psnr(hr_y, preds)
-        # psnr2 = utils.calc_psnr(hr_y, bic_y)
+            SR = SR + bic_y
+        SR = SR.clamp(0.0, 1.0)
+        psnr = utils.calc_psnr(hr_y, SR)
         Avg_psnr.update(psnr, 1)
         print(f'{imgName}, ' + 'PSNR: {:.2f}'.format(psnr.item()))
-        # print(f'{imgName}, ' + 'PSNR_bic: {:.2f}'.format(psnr2.item()))
         # GPU tensor -> CPU tensor -> numpy
-        preds = preds.mul(255.0).cpu().numpy().squeeze(0).squeeze(0)
+        SR = SR.mul(255.0).cpu().numpy().squeeze(0).squeeze(0)
         if image.mode == 'L':
-            output = np.clip(preds, 0.0, 255.0).astype(np.uint8)  # chw -> hwc
+            output = np.clip(SR, 0.0, 255.0).astype(np.uint8)  # chw -> hwc
         else:
-            output = np.array([preds, ycbcr[..., 1], ycbcr[..., 2]]).transpose([1, 2, 0]) # chw -> hwc
+            ycbcr = ycbcr.mul(255.0).cpu().numpy().squeeze(0).transpose([1, 2, 0])
+            output = np.array([SR, ycbcr[..., 1], ycbcr[..., 2]]).transpose([1, 2, 0]) # chw -> hwc
             output = np.clip(utils.ycbcr2rgb(output), 0.0, 255.0).astype(np.uint8)
         output = Image.fromarray(output) # hw -> wh
         output.save(outputs_dir + imgName.replace('.', f'_FSRCNN_x{scale}.'))

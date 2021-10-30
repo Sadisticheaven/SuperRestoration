@@ -14,21 +14,14 @@ def visual_csv(csv_path, viz, line_name):
             epoch.append(int(row[0]))
             loss.append(float(row[1]))
             psnr.append(float(row[2]))
-
-    viz.line(Y=loss,
-             X=epoch,
-             win='Loss',
-             name=line_name,  # 线条名称
+    viz.line(Y=loss, X=epoch, win='Loss', name=line_name,  # 线条名称
              update='append',  # 以添加方式加入
              opts={
                  'showlegend': True,  # 显示网格
                  'xlabel': "epoch",  # x轴标签
                  'ylabel': "loss",  # y轴标签
              })
-    viz.line(Y=psnr,
-             X=epoch,
-             win='PSNR',
-             name=line_name,  # 线条名称
+    viz.line(Y=psnr, X=epoch, win='PSNR', name=line_name,  # 线条名称
              update='append',  # 以添加方式加入
              opts={
                  'showlegend': True,  # 显示网格
