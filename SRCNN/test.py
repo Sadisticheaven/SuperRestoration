@@ -9,21 +9,19 @@ from imresize import imresize
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 if __name__ == '__main__':
-
-    # config = {'weight_file': './weight_file/SRCNN_x3_data=matlab_lr=1e-2_batch=128/',
-    config = {'weight_file': './weight_file/SRCNN_x2/',
-              'img_dir': '../datasets/Set14/',
-              'outputs_dir': './test_res/test_x2_Set14/',
-              'scale': 2,
-              'visual_filter': False
+    config = {'weight_file': './weight_file/',
+              'img_dir': '../datasets/Set5/',
+              'outputs_dir': './test_res/test_x4_Set5/',
+              'scale': 4,
+              'visual_filter': True
               }
 
     outputs_dir = config['outputs_dir']
     scale = config['scale']
     padding = scale
-    # weight_file = config['weight_file'] + f'best.pth'
+    weight_file = config['weight_file'] + f'best.pth'
     # weight_file = config['weight_file'] + f'SRCNNx3_data=276864_lr=1e-2.pth'
-    weight_file = config['weight_file'] + f'x{scale}/best.pth'
+    # weight_file = config['weight_file'] + f'x{scale}/best.pth'
     img_dir = config['img_dir']
     outputs_dir = outputs_dir + f'x{scale}/'
     utils.mkdirs(outputs_dir)
@@ -44,7 +42,7 @@ if __name__ == '__main__':
         model.load_state_dict(checkpoint)
 
     if config['visual_filter']:
-        ax = utils.viz_layer(model.conv1.weight.cpu(), 64)
+        ax = utils.viz_layer(model.conv1[0].weight.cpu(), 64)
     model.eval()
     imglist = os.listdir(img_dir)
     Avg_psnr = utils.AverageMeter()

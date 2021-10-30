@@ -83,7 +83,7 @@ def validate(model, val_dataloader, device, residual=False):
     return epoch_psnr
 
 
-def save_checkpoint(model, optimizer, epoch, epoch_losses, epoch_psnr, best_psnr, outputs_dir, csv_writer):
+def save_checkpoint(model, optimizer, epoch, epoch_losses, epoch_psnr, best_psnr, best_epoch, outputs_dir, csv_writer):
     state = {'model': model.state_dict(), 'optimizer': optimizer.state_dict(), 'epoch': epoch,
              'loss': epoch_losses.avg, 'psnr': epoch_psnr.avg}
     torch.save(state, outputs_dir + f'latest.pth')

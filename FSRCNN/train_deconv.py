@@ -91,5 +91,5 @@ def train_model(config, from_pth=False, pre_train=None, useVisdom=False):
             utils.draw_line(viz, X=[best_epoch], Y=[epoch_psnr.avg], win='PSNR', linename='valPSNR')
 
         best_epoch, best_psnr = model_utils.save_checkpoint(model, optimizer, epoch, epoch_losses,
-                                                            epoch_psnr, best_psnr, outputs_dir, writer)
+                                                            epoch_psnr, best_psnr, best_epoch, outputs_dir, writer)
     print('best epoch: {}, psnr: {:.2f}'.format(best_epoch, best_psnr))
