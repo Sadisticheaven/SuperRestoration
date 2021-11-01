@@ -22,12 +22,15 @@ Similiarly, I give a python version of the `rgb2ycbcr()` and `ycbcr2rgb()` in ma
 
 # Usage
 ## Prepare Datasets
-*Run ***data_aug.py*** to augment datasets.
-*Run ***prepare.py*** to generate trainning and validation data. (You may need to modify parameters in `config`.)
+* Run `data_aug.py` to augment datasets.  
+* Run `prepare.py` to generate trainning and validation data. (You may need to modify parameters in `config`.)
 ## Train
-Take **SRCNN** as an example, run ***SRCNN_x2.py*** to train SRCNN. You can modify the training parameters according to your needs follow this template.
+Take **SRCNN** as an example, run `SRCNN_x2.py` to train SRCNN. You can modify the training parameters according to your needs follow this template.
 ## Test
-Run ***test.py*** to generate test result and calculate PSNR. (you can modify parameters to specify testsets.)
+Run `test.py` to generate test result and calculate PSNR. (You can modify parameters to specify testsets.)
+## Visualize
+Run `csv2visdom.py` can visualize converge curve with visdom. (You need to install `visdom` and run it in advance.)  
+Then visit `localhost:8097`.
 
 # Result: PSNR
 ## SRCNN x3
