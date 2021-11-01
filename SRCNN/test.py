@@ -9,19 +9,19 @@ from imresize import imresize
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 if __name__ == '__main__':
-    config = {'weight_file': './weight_file/',
-              'img_dir': '../datasets/Set5/',
-              'outputs_dir': './test_res/test_x4_Set5/',
-              'scale': 4,
+    scale = 2
+    config = {'weight_file': f'./weight_file/SRCNN_x{scale}_lr=e-1_batch=512/',
+              'img_dir': '../datasets/Set14/',
+              'outputs_dir': f'./test_res/test_x{scale}_Set14/',
               'visual_filter': True
               }
 
     outputs_dir = config['outputs_dir']
-    scale = config['scale']
+
     padding = scale
-    weight_file = config['weight_file'] + f'best.pth'
+    # weight_file = config['weight_file'] + f'best.pth'
     # weight_file = config['weight_file'] + f'SRCNNx3_data=276864_lr=1e-2.pth'
-    # weight_file = config['weight_file'] + f'x{scale}/best.pth'
+    weight_file = config['weight_file'] + f'x{scale}/best.pth'
     img_dir = config['img_dir']
     outputs_dir = outputs_dir + f'x{scale}/'
     utils.mkdirs(outputs_dir)

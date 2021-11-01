@@ -25,7 +25,6 @@ if __name__ == '__main__':
     padding = scale
     weight_file = config['weight_file'] + f'best.pth'
     # weight_file = config['weight_file'] + f'latest.pth'
-    # weight_file = config['weight_file'] + f'FSRCNNx3_lr=e-2_91img.pth'
     # weight_file = config['weight_file'] + f'x{scale}/best.pth'
     img_dir = config['img_dir']
     outputs_dir = outputs_dir + f'x{scale}/'
@@ -40,7 +39,6 @@ if __name__ == '__main__':
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
     model = G().to(device)
-    # model = FSRCNN(scale, in_size, out_size).to(device)
     checkpoint = torch.load(weight_file)
     if len(checkpoint) < 6:
         model.load_state_dict(checkpoint['model'])
