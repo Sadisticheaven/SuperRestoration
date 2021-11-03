@@ -10,6 +10,7 @@ os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 if __name__ == '__main__':
 
     config = {'weight_file': './',
+    # config = {'weight_file': './weight_file/SRResNet_x4_MSRA_DIV2Kaug_lr=e-4_batch=16_out=96/',
               'img_dir': '../datasets/Set14/',
               'outputs_dir': './test_res/test_SRResNet_Set14/',
               'in_size': 24,
@@ -57,20 +58,17 @@ if __name__ == '__main__':
         hr_image = np.array(image)
 
         lr_image = imresize(hr_image, 1. / scale, 'bicubic')
-        bic_image = imresize(lr_image, scale, 'bicubic')
-        bic_image = bic_image[padding: -padding, padding: -padding, ...]
+        bic_image = imresize(lr_image, scale, 'bicubic')[padding: -padding, padding: -padding, ...]
         bic_pil = Image.fromarray(bic_image.astype(np.uint8))
         bic_pil.save(outputs_dir + imgName.replace('.', f'_bicubic_x{scale}.'))
 
-        hr_image = hr_image[padding: -padding, padding: -padding, ...]
-
-        # _, lr = utils.preprocess(lr_image, device, image.mode)
-        lr = np.array(lr_image).astype(np.float32).transpose([2, 0, 1])  # whc -> hwc -> chw
+        lr = lr_image.astype(np.float32).transpose([2, 0, 1])  # hwc -> chw
         lr /= 255.
         lr = torch.from_numpy(lr).to(device).unsqueeze(0)
+        hr_image = hr_image[padding: -padding, padding: -padding, ...]
 
         with torch.no_grad():
-            SR = model(lr).clamp(0.0, 1.0)
+            SR = model(lr) * 0.5 + 0.5
         SR = SR[..., padding: -padding, padding: -padding]
         SR = SR.mul(255.0).cpu().numpy().squeeze(0)
         SR = np.clip(SR, 0.0, 255.0).transpose([1, 2, 0])

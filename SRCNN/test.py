@@ -9,10 +9,10 @@ from imresize import imresize
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 if __name__ == '__main__':
-    scale = 2
-    config = {'weight_file': f'./weight_file/SRCNN_x{scale}_lr=e-1_batch=512/',
-              'img_dir': '../datasets/Set14/',
-              'outputs_dir': f'./test_res/test_x{scale}_Set14/',
+    scale = 3
+    config = {'weight_file': f'./weight_file/SRCNN_x{scale}_lr=1e-02_batch=128/',
+              'img_dir': '../datasets/Set5/',
+              'outputs_dir': f'./test_res/test_x{scale}_Set5/',
               'visual_filter': True
               }
 

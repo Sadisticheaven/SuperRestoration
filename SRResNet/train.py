@@ -7,7 +7,7 @@ from torch.backends import cudnn
 from torchvision import models
 from model import G, D
 from torch import nn, optim
-from SRResNetdatasets import SRResNetValDataset, SRResNetTrainDataset
+from SRResNetdatasets import SRResNetValDataset, SRResNetTrainDataset, DIV2KDataset
 from torch.utils.data.dataloader import DataLoader
 import numpy as np
 # 导入Visdom类
@@ -34,7 +34,7 @@ def train_model(config, from_pth=False, useVisdom=False):
 
     # ----需要修改部分------
     print("===> Loading datasets")
-    train_dataset = SRResNetTrainDataset(config['train_file'])
+    train_dataset = DIV2KDataset(config['train_file'])
     train_dataloader = DataLoader(dataset=train_dataset, num_workers=config['num_workers'],
                                   batch_size=batch_size, shuffle=True, pin_memory=True)
     val_dataset = SRResNetValDataset(config['val_file'])
@@ -132,7 +132,7 @@ def train_model(config, from_pth=False, useVisdom=False):
             inputs, labels = data
             inputs = inputs.to(device)
             with torch.no_grad():
-                preds = model(inputs)
+                preds = model(inputs) * 0.5 + 0.5
             preds = preds.mul(255.0).cpu().numpy().squeeze(0)
             preds = preds.transpose([1, 2, 0])  #chw->hwc
             preds = np.clip(preds, 0.0, 255.0)

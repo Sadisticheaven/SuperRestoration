@@ -71,10 +71,8 @@ def gen_valdata(config):
     imgList = os.listdir(hrDir)
     for i, imgName in enumerate(imgList):
         hrIMG = utils.loadIMG_crop(hrDir + imgName, scale)
-        hr = utils.img2ycbcr(hrIMG, gray2rgb=True)
-
+        hr = utils.img2ycbcr(hrIMG, gray2rgb=True).astype(np.float32)
         lr = imresize(hr, 1 / scale, method)
-        hr = utils.rgb2ycbcr(hr).astype(np.float32)
 
         data = lr.astype(np.float32).transpose([2, 0, 1])
         label = hr.transpose([2, 0, 1])
@@ -87,6 +85,6 @@ def gen_valdata(config):
 if __name__ == '__main__':
     # config = {'hrDir': './test/flower', 'scale': 3, "stride": 14, "size_input": 33, "size_label": 21}
     config = {'hrDir': '../datasets/291_aug', 'scale': 4, 'stride': 12, "size_input": 24, "size_output": 96, 'method': 'bicubic'}
-    #gen_traindata(config)
+    #gen_traindata(config)  # if use DIV2K, don't need to run this line.
     config['hrDir'] = '../datasets/Set5'
     gen_valdata(config)
