@@ -1,5 +1,5 @@
 # SuperRestoration
-Include：SRCNN、FSRCNN、SRResNet
+Include：SRCNN、FSRCNN、SRResNet、SRGAN
 
 # Introduce
 ## Why wrote this?
