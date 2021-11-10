@@ -23,7 +23,7 @@ Similiarly, I give a python version of the `rgb2ycbcr()` and `ycbcr2rgb()` in ma
 # Usage
 ## Prepare Datasets
 * Run `data_aug.py` to augment datasets.  
-* Run `prepare.py` to generate trainning and validation data. (You may need to modify parameters in `config`.)
+* Run `gen_datasets.py` to generate trainning and validation data. (You may need to modify parameters in `config`.)
 ## Train
 Take **SRCNN** as an example, run `SRCNN_x2.py` to train SRCNN. You can modify the training parameters according to your needs follow this template.
 ## Test
@@ -59,17 +59,45 @@ monarch|32.39|32.54|
 pepper|34.35|34.24|
 ppt3|26.02|26.14|
 zebra|28.87|28.80|
-||29.00|29.01|
+| |29.00|29.01|
 
 ## FSRCNN x3
 Train on 91-images.
+
 |   |Paper| Ours|
 ----|---|---|
 Set5|33.06|33.06|
 Set14|29.37|29.35|
 BSDS200|28.55|28.95|
 
+## SRResNet x4
+Train on DIV2K.
 
+|   |Paper| Ours|
+----|---|---|
+Set5|32.05|32.12|
+Set14|28.49|28.50|
+BSDS100|27.58|27.54|
 
+## SRGAN x4
+Train on DIV2K.
 
+|   |Paper| Ours|
+----|---|---|
+Set5|29.40|30.19|
+Set14|26.02|26.94|
+BSDS100|25.16|25.82|
+
+SRGAN cannot be evaluated by PSNR alone, so I list some test result.  
+Obviously, SRGAN generates a sharper results than SRResNet and looks more realistic.
+
+|bicubic|SRResNet|SRGAN|original|
+---|---|---|---|
+![Image text](./SRResNet/result/baby_GT_bicubic_x4.bmp)|![Image text](./SRResNet/result/baby_GT_SRResNet_x4.bmp)|![Image text](./SRResNet/result/baby_GT_SRGAN_x4.bmp)|![Image text](./SRResNet/result/baby_GT.bmp)
+![Image text](./SRResNet/result/woman_GT_bicubic_x4.bmp)|![Image text](./SRResNet/result/woman_GT_SRResNet_x4.bmp)|![Image text](./SRResNet/result/woman_GT_SRGAN_x4.bmp)|![Image text](./SRResNet/result/woman_GT.bmp)
+![Image text](./SRResNet/result/head_GT_bicubic_x4.bmp)|![Image text](./SRResNet/result/head_GT_SRResNet_x4.bmp)|![Image text](./SRResNet/result/head_GT_SRGAN_x4.bmp)|![Image text](./SRResNet/result/head_GT.bmp)
+![Image text](./SRResNet/result/baboon_bicubic_x4.bmp)|![Image text](./SRResNet/result/baboon_SRResNet_x4.bmp)|![Image text](./SRResNet/result/baboon_SRGAN_x4.bmp)|![Image text](./SRResNet/result/baboon.bmp)
+![Image text](./SRResNet/result/coastguard_bicubic_x4.bmp)|![Image text](./SRResNet/result/coastguard_SRResNet_x4.bmp)|![Image text](./SRResNet/result/coastguard_SRGAN_x4.bmp)|![Image text](./SRResNet/result/coastguard.bmp)
+![Image text](./SRResNet/result/comic_bicubic_x4.bmp)|![Image text](./SRResNet/result/comic_SRResNet_x4.bmp)|![Image text](./SRResNet/result/comic_SRGAN_x4.bmp)|![Image text](./SRResNet/result/comic.bmp)
+![Image text](./SRResNet/result/flowers_bicubic_x4.bmp)|![Image text](./SRResNet/result/flowers_SRResNet_x4.bmp)|![Image text](./SRResNet/result/flowers_SRGAN_x4.bmp)|![Image text](./SRResNet/result/flowers.bmp)
 

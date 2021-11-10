@@ -36,10 +36,7 @@ if __name__ == '__main__':
 
     model = SRCNN(padding=True).to(device)
     checkpoint = torch.load(weight_file)
-    if len(checkpoint) < 6:
-        model.load_state_dict(checkpoint['model'])
-    else:
-        model.load_state_dict(checkpoint)
+    model.load_state_dict(checkpoint['model'])
 
     if config['visual_filter']:
         ax = utils.viz_layer(model.conv1[0].weight.cpu(), 64)

@@ -6,7 +6,7 @@ import torch
 from torch.backends import cudnn
 from torch import nn, optim
 from model import N2_10_4, CLoss, HuberLoss, FSRCNN
-from FSRCNNdatasets import T91TrainDataset, T91ValDataset, T91ResValDataset
+from FSRCNNdatasets import TrainDataset, ValDataset, ResValDataset
 from torch.utils.data.dataloader import DataLoader
 # 导入Visdom类
 from visdom import Visdom
@@ -43,16 +43,16 @@ def train_model(config, from_pth=False, pre_train=None, useVisdom=False):
         {'params': model.deconv_layer.parameters(), 'lr': lr},
     ], lr=lr, momentum=0.9)  # 前两层学习率lr， 最后一层学习率lr*0.1
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=config['step_size'], gamma=config['gamma'])
-    train_dataset = T91TrainDataset(config['train_file'])
+    train_dataset = TrainDataset(config['train_file'])
     train_dataloader = DataLoader(dataset=train_dataset,
                                   batch_size=batch_size,
                                   shuffle=True,
                                   num_workers=config['num_workers'],
                                   pin_memory=True)
     if config['residual']:
-        val_dataset = T91ResValDataset(config['val_file'])
+        val_dataset = ResValDataset(config['val_file'])
     else:
-        val_dataset = T91ValDataset(config['val_file'])
+        val_dataset = ValDataset(config['val_file'])
     val_dataloader = DataLoader(dataset=val_dataset, batch_size=1)
     # ----END------
     start_epoch, best_epoch, best_psnr, writer, csv_file = \

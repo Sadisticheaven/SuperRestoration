@@ -8,25 +8,21 @@ from imresize import imresize
 import os
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 if __name__ == '__main__':
-
-    config = {'weight_file': './',
+    model_name = 'SRGAN'
+    test_data = 'Set14'
+    config = {'weight_file': './weight_file/SRGAN_x4_MSRA_DIV2Kaug_lr=e-4_batch=16_out=96/',
     # config = {'weight_file': './weight_file/SRResNet_x4_MSRA_DIV2Kaug_lr=e-4_batch=16_out=96/',
-              'img_dir': '../datasets/Set14/',
-              'outputs_dir': './test_res/test_SRResNet_Set14/',
-              'in_size': 24,
-              'out_size': 96,
+              'img_dir': f'../datasets/{test_data}/',
+              'outputs_dir': f'./test_res/test_{model_name}_{test_data}/',
               'scale': 4,
               'visual_filter': False
               }
-
     outputs_dir = config['outputs_dir']
     scale = config['scale']
-    in_size = config['in_size']
-    out_size = config['out_size']
     padding = scale
-    weight_file = config['weight_file'] + f'best.pth'
+    # weight_file = config['weight_file'] + f'best.pth'
     # weight_file = config['weight_file'] + f'latest.pth'
-    # weight_file = config['weight_file'] + f'x{scale}/best.pth'
+    weight_file = config['weight_file'] + f'x{scale}/latest.pth'
     img_dir = config['img_dir']
     outputs_dir = outputs_dir + f'x{scale}/'
     utils.mkdirs(outputs_dir)
@@ -41,10 +37,10 @@ if __name__ == '__main__':
 
     model = G().to(device)
     checkpoint = torch.load(weight_file)
-    if len(checkpoint) < 6:
-        model.load_state_dict(checkpoint['model'])
+    if model_name == 'SRGAN':
+        model.load_state_dict(checkpoint['gen'])
     else:
-        model.load_state_dict(checkpoint)
+        model.load_state_dict(checkpoint['model'])
 
     if config['visual_filter']:
         ax = utils.viz_layer(model.extract_layer[0].weight.cpu(), 56)
@@ -54,6 +50,9 @@ if __name__ == '__main__':
     Avg_psnr = utils.AverageMeter()
     for imgName in imglist:
         image = utils.loadIMG_crop(img_dir + imgName, scale)
+        img_mode = image.mode
+        if img_mode == 'L':
+            gray_img = np.array(image)
         image = image.convert('RGB')
         hr_image = np.array(image)
 
@@ -72,13 +71,18 @@ if __name__ == '__main__':
         SR = SR[..., padding: -padding, padding: -padding]
         SR = SR.mul(255.0).cpu().numpy().squeeze(0)
         SR = np.clip(SR, 0.0, 255.0).transpose([1, 2, 0])
-        SR_y = utils.rgb2ycbcr(SR).astype(np.float32)[..., 0] / 255.
-        hr_y = utils.rgb2ycbcr(hr_image).astype(np.float32)[..., 0]/255.
+        if img_mode != 'L':
+            SR_y = utils.rgb2ycbcr(SR).astype(np.float32)[..., 0] / 255.
+            hr_y = utils.rgb2ycbcr(hr_image).astype(np.float32)[..., 0]/255.
+        else:
+            hr_y = gray_img.astype(np.float32)[padding: -padding, padding: -padding, ...] / 255.
+            SR = Image.fromarray(SR.astype(np.uint8)).convert('L')
+            SR_y = np.array(SR).astype(np.float32) / 255.
         psnr = utils.calc_psnr(hr_y, SR_y)
         Avg_psnr.update(psnr, 1)
         print(f'{imgName}, ' + 'PSNR: {:.2f}'.format(psnr.item()))
         # GPU tensor -> CPU tensor -> numpy
-        output = SR.astype(np.uint8)
+        output = np.array(SR).astype(np.uint8)
         output = Image.fromarray(output) # hw -> wh
-        output.save(outputs_dir + imgName.replace('.', f'_SRResNet_x{scale}.'))
+        output.save(outputs_dir + imgName.replace('.', f'_{model_name}_x{scale}.'))
     print('Average_PSNR: {:.2f}'.format(Avg_psnr.avg))

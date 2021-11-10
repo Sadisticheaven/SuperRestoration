@@ -55,7 +55,10 @@ class DIV2KDataset(Dataset):
         image = np.array(Image.open(img_path))
         transpose = A.RandomCrop(width=96, height=96)
         image = transpose(image=image)["image"]
-        label = torch.from_numpy(image.astype(np.float32).transpose([2, 0, 1]) / 255 * 2 - 1)
+        # transpose2 = A.Normalize(0.5, 0.5)
+        # label = transpose2(image=image)["image"]
+        # label = torch.from_numpy(label.astype(np.float32).transpose([2, 0, 1]))
+        label = torch.from_numpy(image.astype(np.float32).transpose([2, 0, 1])/127.5-1)
         data = imresize(image, 1 / 4, 'bicubic')
         data = torch.from_numpy(data.astype(np.float32).transpose([2, 0, 1]) / 255)
         return data, label

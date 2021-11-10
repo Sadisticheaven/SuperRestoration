@@ -3,9 +3,9 @@ import numpy as np
 from torch.utils.data import Dataset
 
 
-class T91TrainDataset(Dataset):
+class TrainDataset(Dataset):
     def __init__(self, h5_file):
-        super(T91TrainDataset, self).__init__()
+        super(TrainDataset, self).__init__()
         self.h5_file = h5_file
 
     def __getitem__(self, idx):
@@ -17,9 +17,9 @@ class T91TrainDataset(Dataset):
             return len(f['data'])
 
 
-class T91ValDataset(Dataset):
+class ValDataset(Dataset):
     def __init__(self, h5_file):
-        super(T91ValDataset, self).__init__()
+        super(ValDataset, self).__init__()
         self.h5_file = h5_file
 
     def __getitem__(self, idx):
@@ -31,9 +31,9 @@ class T91ValDataset(Dataset):
             return len(f['data'])
 
 
-class T91ResValDataset(Dataset):
+class ResValDataset(Dataset):
     def __init__(self, h5_file):
-        super(T91ResValDataset, self).__init__()
+        super(ResValDataset, self).__init__()
         self.h5_file = h5_file
 
     def __getitem__(self, idx):

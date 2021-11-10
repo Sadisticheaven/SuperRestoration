@@ -78,52 +78,67 @@ class D(nn.Module):
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
             # in:96*96
             nn.Conv2d(64, 64, kernel_size=3, padding=1, stride=2, padding_mode=padding_mode),
-            nn.BatchNorm2d(64, affine=True),
+            nn.BatchNorm2d(64),
             nn.LeakyReLU(0.2, inplace=True),
             # in:48*48
             nn.Conv2d(64, 128, kernel_size=3, padding=1, padding_mode=padding_mode),
-            nn.BatchNorm2d(128, affine=True),
+            nn.BatchNorm2d(128),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Conv2d(128, 128, kernel_size=3, padding=1, stride=2, padding_mode=padding_mode),
-            nn.BatchNorm2d(128, affine=True),
+            nn.BatchNorm2d(128),
             nn.LeakyReLU(0.2, inplace=True),
             # in:24*24
             nn.Conv2d(128, 256, kernel_size=3, padding=1, padding_mode=padding_mode),
-            nn.BatchNorm2d(256, affine=True),
+            nn.BatchNorm2d(256),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Conv2d(256, 256, kernel_size=3, padding=1, stride=2, padding_mode=padding_mode),
-            nn.BatchNorm2d(256, affine=True),
+            nn.BatchNorm2d(256),
             nn.LeakyReLU(0.2, inplace=True),
             # in:12*12
             nn.Conv2d(256, 512, kernel_size=3, padding=1, padding_mode=padding_mode),
-            nn.BatchNorm2d(512, affine=True),
+            nn.BatchNorm2d(512),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Conv2d(512, 512, kernel_size=3, padding=1, stride=2, padding_mode=padding_mode),
-            nn.BatchNorm2d(512, affine=True),
+            nn.BatchNorm2d(512),
             nn.LeakyReLU(0.2, inplace=True),
         )
         # in:6*6
-        self.fc1 = nn.Linear(512*6*6, 1024)
-        self.Lrelu = nn.LeakyReLU(0.2, inplace=True)
-        self.fc2 = nn.Linear(1024, 1)
-        self.sig = nn.Sigmoid()
+        self.dense = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(512*6*6, 1024),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Linear(1024, 1)
+        )
 
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                m.weight.data.normal_(0.0, 0.02)
-            elif isinstance(m, nn.BatchNorm2d):
-                m.weight.data.normal_(1.0, 0.02)
-                m.bias.data.fill_(0)
+    def init_weight(self):
+        for L in self.modules():
+            if isinstance(L, nn.Conv2d):
+                n = L.kernel_size[0] * L.kernel_size[1] * L.out_channels
+                L.weight.data.normal_(0, math.sqrt(2. / n))
+                if L.bias is not None:
+                    L.bias.data.zero_()
 
     def forward(self, x):
         x = self.features(x)
-        x = self.fc1(x)
-        x = self.Lrelu(x)
-        x = self.fc2(x)
-        x = self.sig(x)
-        return x
+        x = self.dense(x)
+        return torch.sigmoid(x)
 
 
+def test():
+    low_resolution = 24  # 96x96 -> 24x24
+    with torch.cuda.amp.autocast():
+        x = torch.randn((5, 3, low_resolution, low_resolution))
+        gen = G()
+        gen_out = gen(x)
+        disc = D()
+        disc_out = disc(gen_out)
+
+        print(gen_out.shape)
+        print(disc_out.shape)
+
+
+if __name__ == "__main__":
+    test()
 
 
 
