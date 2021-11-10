@@ -89,7 +89,7 @@ Set14|26.02|26.94|
 BSDS100|25.16|25.82|
 
 SRGAN cannot be evaluated by PSNR alone, so I list some test result.  
-Obviously, SRGAN generates a sharper results than SRResNet and looks more realistic.
+Obviously, SRGAN generates a sharper results than SRResNet and looks more convincing.
 
 |bicubic|SRResNet|SRGAN|original|
 ---|---|---|---|
