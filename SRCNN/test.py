@@ -13,7 +13,7 @@ if __name__ == '__main__':
     config = {'weight_file': f'./weight_file/SRCNN_x{scale}_lr=1e-02_batch=128/',
               'img_dir': '../datasets/Set5/',
               'outputs_dir': f'./test_res/test_x{scale}_Set5/',
-              'visual_filter': True
+              'visual_filter': False
               }
 
     outputs_dir = config['outputs_dir']
@@ -52,7 +52,7 @@ if __name__ == '__main__':
         lr_image = imresize(hr_image, 1. / scale, 'bicubic')
         bic_image = imresize(lr_image, scale, 'bicubic')
         bic_pil = Image.fromarray(bic_image.astype(np.uint8)[padding: -padding, padding: -padding, ...])
-        bic_pil.save(outputs_dir + imgName.replace('.', f'_bicubic_x{scale}.'))
+        bic_pil.save(outputs_dir + imgName.replace('.bmp', f'_bicubic_x{scale}.png'))
 
         bic_y, bic_ycbcr = utils.preprocess(bic_image, device, image.mode)
         hr_y, _ = utils.preprocess(hr_image, device, image.mode)
@@ -78,5 +78,5 @@ if __name__ == '__main__':
             output = np.array([SR, bic_ycbcr[..., 1], bic_ycbcr[..., 2]]).transpose([1, 2, 0])  # chw -> hwc
             output = np.clip(utils.ycbcr2rgb(output), 0.0, 255.0).astype(np.uint8)
         output = Image.fromarray(output)  # hw -> wh
-        output.save(outputs_dir + imgName.replace('.', f'_SRCNNx{scale}.'))
+        output.save(outputs_dir + imgName.replace('.bmp', f'_SRCNNx{scale}.png'))
     print('Average_PSNR: {:.2f}'.format(Avg_psnr.avg))

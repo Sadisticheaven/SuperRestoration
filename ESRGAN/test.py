@@ -8,13 +8,13 @@ from imresize import imresize
 import os
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 if __name__ == '__main__':
-    model_name = 'SRGAN'
-    test_data = 'Set14'
-    config = {'weight_file': './',
-    # config = {'weight_file': './weight_file/SRGAN2_x4_MSRA_DIV2Kaug_lr=e-4_batch=16_out=96/',
+    model_name = 'ESRGAN'
+    test_data = 'Set5'
+    # config = {'weight_file': './',
+    config = {'weight_file': './weight_file/ESRGAN_pre_x4_DFO_lr=2e-4_batch=16_out=128/',
     # config = {'weight_file': './weight_file/SRResNet_x4_MSRA_DIV2Kaug_lr=e-4_batch=16_out=96/',
               'img_dir': f'../datasets/{test_data}/',
-              'outputs_dir': f'./test_res/test_{model_name}2_{test_data}/',
+              'outputs_dir': f'./test_res/test_{model_name}_{test_data}/',
               'scale': 4,
               'visual_filter': False
               }
@@ -22,8 +22,8 @@ if __name__ == '__main__':
     scale = config['scale']
     padding = scale
     # weight_file = config['weight_file'] + f'best.pth'
-    weight_file = config['weight_file'] + f'epoch_200.pth'
-    # weight_file = config['weight_file'] + f'x{scale}/latest.pth'
+    # weight_file = config['weight_file'] + f'epoch_200.pth'
+    weight_file = config['weight_file'] + f'x{scale}/latest.pth'
     img_dir = config['img_dir']
     outputs_dir = outputs_dir + f'x{scale}/'
     utils.mkdirs(outputs_dir)
@@ -38,10 +38,10 @@ if __name__ == '__main__':
 
     model = G().to(device)
     checkpoint = torch.load(weight_file)
-    if model_name == 'SRGAN':
-        model.load_state_dict(checkpoint['gen'])
-    else:
-        model.load_state_dict(checkpoint['model'])
+    # if model_name == 'ESRGAN':
+    #     model.load_state_dict(checkpoint['gen'])
+    # else:
+    model.load_state_dict(checkpoint['model'])
 
     if config['visual_filter']:
         ax = utils.viz_layer(model.extract_layer[0].weight.cpu(), 56)
@@ -68,7 +68,7 @@ if __name__ == '__main__':
         hr_image = hr_image[padding: -padding, padding: -padding, ...]
 
         with torch.no_grad():
-            SR = model(lr) * 0.5 + 0.5
+            SR = model(lr)
         SR = SR[..., padding: -padding, padding: -padding]
         SR = SR.mul(255.0).cpu().numpy().squeeze(0)
         SR = np.clip(SR, 0.0, 255.0).transpose([1, 2, 0])

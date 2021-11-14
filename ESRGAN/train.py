@@ -8,11 +8,9 @@ import torch
 from torch.backends import cudnn
 from model import G, D
 from torch import nn, optim
-from SRResNetdatasets import SRResNetValDataset, SRResNetTrainDataset, DIV2KDataset
+from ESRGANdatasets import ESRGANValDataset, ESRGANTrainDataset
 from torch.utils.data.dataloader import DataLoader
 import numpy as np
-# 导入Visdom类
-from visdom import Visdom
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 
 
@@ -31,19 +29,19 @@ def train_model(config, from_pth=False):
 
     # ----需要修改部分------
     print("===> Loading datasets")
-    train_dataset = DIV2KDataset(config['train_file'])
+    train_dataset = ESRGANTrainDataset()
     train_dataloader = DataLoader(dataset=train_dataset, num_workers=config['num_workers'],
                                   batch_size=batch_size, shuffle=True, pin_memory=True)
-    val_dataset = SRResNetValDataset(config['val_file'])
+    val_dataset = ESRGANValDataset(config['val_file'])
     val_dataloader = DataLoader(dataset=val_dataset, batch_size=1)
 
     print("===> Building model")
     model = G()
     if not from_pth:
         model.init_weight()
-    criterion = nn.MSELoss().cuda()
+    criterion = nn.L1Loss().cuda()
     optimizer = optim.Adam(model.parameters(), lr=config['lr'])
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', patience=50)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=232, gamma=0.5)
     # ----END------
     start_epoch, best_epoch, best_psnr, writer, csv_file = \
         model_utils.load_checkpoint(config['weight_file'], model, optimizer, csv_file,
@@ -73,7 +71,7 @@ def train_model(config, from_pth=False):
             inputs, labels = data
             inputs = inputs.to(device)
             with torch.no_grad():
-                preds = model(inputs) * 0.5 + 0.5
+                preds = model(inputs)
                 img_grid_fake = torchvision.utils.make_grid(preds, normalize=True)
                 writer_test.add_image(f"Test Fake{idx}", img_grid_fake, global_step=epoch)
             preds = preds.mul(255.0).cpu().numpy().squeeze(0)
@@ -83,7 +81,7 @@ def train_model(config, from_pth=False):
             epoch_psnr.update(utils.calc_psnr(preds, labels.numpy()[0, 0, ...]).item(), len(inputs))
         print('eval psnr: {:.2f}'.format(epoch_psnr.avg))
         if config['auto_lr']:
-            scheduler.step(epoch_psnr.avg)
+            scheduler.step()
 
         writer_scalar.add_scalar('PSNR', epoch_psnr.avg, epoch)
         writer_scalar.add_scalar('Loss', epoch_losses.avg, epoch)

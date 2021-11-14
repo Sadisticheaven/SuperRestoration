@@ -8,6 +8,7 @@ if __name__ == '__main__':
     config = {'train_file': f'../datasets/DIV2K_train_HR/',
               'val_file': f'../datasets/Set5_label={label_size}_val_SRResNetx{scale}.h5',
               'outputs_dir': f'./weight_file/{program}/x{scale}/',
+              'logs_dir': f'./logs/{program}/',
               'csv_name': f'{program}.csv',
               'weight_file': f'./weight_file/{program}/x{scale}/latest.pth',
               'scale': scale,

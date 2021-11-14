@@ -72,7 +72,7 @@ def gen_valdata(config):
     for i, imgName in enumerate(imgList):
         hrIMG = utils.loadIMG_crop(hrDir + imgName, scale)
         hr = utils.img2ycbcr(hrIMG, gray2rgb=True).astype(np.float32)
-        lr = imresize(hr, 1 / scale, method)
+        lr = imresize(np.array(hrIMG).astype(np.float32), 1 / scale, method)
 
         data = lr.astype(np.float32).transpose([2, 0, 1])
         label = hr.transpose([2, 0, 1])

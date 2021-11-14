@@ -10,6 +10,7 @@ if __name__ == '__main__':
               'outputs_dir': f'./weight_file/{program}/x{scale}/',
               'csv_name': f'{program}.csv',
               'weight_file': f'./weight_file/{program}/x{scale}/latest.pth',
+              'logs_dir': f'./logs/{program}/',
               'scale': scale,
               'in_size': 24,
               'out_size': label_size,
