@@ -10,7 +10,7 @@ os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 if __name__ == '__main__':
     model_name = 'SRGAN'
     test_data = 'Set14'
-    config = {'weight_file': './',
+    config = {'weight_file': './weight_file/',
     # config = {'weight_file': './weight_file/SRGAN2_x4_MSRA_DIV2Kaug_lr=e-4_batch=16_out=96/',
     # config = {'weight_file': './weight_file/SRResNet_x4_MSRA_DIV2Kaug_lr=e-4_batch=16_out=96/',
               'img_dir': f'../datasets/{test_data}/',
@@ -22,7 +22,7 @@ if __name__ == '__main__':
     scale = config['scale']
     padding = scale
     # weight_file = config['weight_file'] + f'best.pth'
-    weight_file = config['weight_file'] + f'epoch_200.pth'
+    weight_file = config['weight_file'] + f'latest.pth'
     # weight_file = config['weight_file'] + f'x{scale}/latest.pth'
     img_dir = config['img_dir']
     outputs_dir = outputs_dir + f'x{scale}/'

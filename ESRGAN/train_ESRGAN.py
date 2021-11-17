@@ -12,7 +12,7 @@ from torch import nn, optim
 from ESRGANdatasets import ESRGANValDataset, ESRGANTrainDataset
 from torch.utils.data.dataloader import DataLoader
 import numpy as np
-
+import niqe
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 
 
@@ -47,10 +47,10 @@ def train_model(config, pre_train, from_pth=False):
     vgg_loss = VGGLoss(device)
     gen_opt = optim.Adam(gen.parameters(), lr=config['gen_lr'])
     disc_opt = optim.Adam(disc.parameters(), lr=config['disc_lr'])
-    scheduler1 = torch.optim.lr_scheduler.MultiStepLR(gen_opt, step_size=[58, 116, 232, 348], gamma=0.5)
-    scheduler2 = torch.optim.lr_scheduler.MultiStepLR(disc_opt, step_size=[58, 116, 232, 348], gamma=0.5)
+    scheduler1 = torch.optim.lr_scheduler.MultiStepLR(gen_opt, milestones=[58, 116, 232, 348], gamma=0.5)
+    scheduler2 = torch.optim.lr_scheduler.MultiStepLR(disc_opt, milestones=[58, 116, 232, 348], gamma=0.5)
     # ----END------
-    start_epoch, best_epoch, best_psnr, writer, csv_file = \
+    start_epoch, best_epoch, best_psnr, best_niqe, writer, csv_file = \
         model_utils.load_GAN_checkpoint(pre_train, config['weight_file'], gen, gen_opt, disc, disc_opt,
                                         csv_file, from_pth, config['auto_lr'])
 
@@ -61,16 +61,15 @@ def train_model(config, pre_train, from_pth=False):
     gen = gen.to(device)
     disc = disc.to(device)
 
-    writer_fake = SummaryWriter(f"{logs_dir}/fake")
-    writer_real = SummaryWriter(f"{logs_dir}/real")
+    # writer_fake = SummaryWriter(f"{logs_dir}/fake")
+    # writer_real = SummaryWriter(f"{logs_dir}/real")
     writer_scalar = SummaryWriter(f"{logs_dir}/scalar")
     writer_test = SummaryWriter(f"{logs_dir}/test")
-    writer_gnd = SummaryWriter(f"{logs_dir}/gnd")
 
     adversarial_weight = config['adversarial_weight']
     pixel_weight = config['pixel_weight']
     for epoch in range(start_epoch, num_epochs):
-        print('learning rate: Gen: {}, Disc: {}\n'.format(config['gen_lr'], config['disc_lr']))
+        print('learning rate: Gen: {}, Disc: {}\n'.format(model_utils.get_lr(gen_opt), model_utils.get_lr(disc_opt)))
         with tqdm(total=(len(train_dataset) - len(train_dataset) % batch_size)) as t:
             t.set_description(f'epoch:{epoch}/{num_epochs - 1}')
             gen.train()
@@ -103,9 +102,10 @@ def train_model(config, pre_train, from_pth=False):
                 # Train Generator min(log(1-D(G(z))) <-> max logD(G(z))
                 if batch_idx % gen_k == 0:
                     disc_fake = disc(fake)
+                    disc_real = disc(labels)
                     pixel_loss = l1(fake, labels)
-                    adversarial_loss = bce(torch.sigmoid(disc_fake - disc_real.mean()), torch.ones_like(disc_fake)) + \
-                                       bce(torch.sigmoid(disc_real - disc_fake.mean()), torch.ones_like(disc_real))
+                    adversarial_loss =(bce(torch.sigmoid(disc_fake - disc_real.mean()), torch.ones_like(disc_fake)) + \
+                                       bce(torch.sigmoid(disc_real - disc_fake.mean()), torch.zeros_like(disc_real)))/2
                     percep_loss = vgg_loss(fake, labels)
                     gen_loss = percep_loss + adversarial_weight * adversarial_loss + pixel_weight * pixel_loss
                     gen_opt.zero_grad()
@@ -118,13 +118,13 @@ def train_model(config, pre_train, from_pth=False):
                 t.set_postfix(loss='Gloss: {:.6f}, Dloss: {:.6f}, fake: {:.2f}, real: {:.2f}'
                               .format(G_losses.avg, D_losses.avg, F_prob.avg, R_prob.avg))
                 t.update(len(inputs))
-                if batch_idx == 0:
-                    with torch.no_grad():
-                        fake = gen(inputs)
-                    img_grid_fake = torchvision.utils.make_grid(fake, normalize=True)
-                    img_grid_real = torchvision.utils.make_grid(labels, normalize=True)
-                    writer_fake.add_image("Fake Images", img_grid_fake, global_step=epoch)
-                    writer_real.add_image("Real Images", img_grid_real, global_step=epoch)
+                # if batch_idx == 0:
+                #     with torch.no_grad():
+                #         fake = gen(inputs)
+                #     img_grid_fake = torchvision.utils.make_grid(fake, normalize=True)
+                #     img_grid_real = torchvision.utils.make_grid(labels, normalize=True)
+                #     writer_fake.add_image("Fake Images", img_grid_fake, global_step=epoch)
+                #     writer_real.add_image("Real Images", img_grid_real, global_step=epoch)
         writer_scalar.add_scalar('DLoss', D_losses.avg, epoch)
         writer_scalar.add_scalar('GLoss', G_losses.avg, epoch)
         if isinstance(gen, torch.nn.DataParallel):
@@ -132,26 +132,27 @@ def train_model(config, pre_train, from_pth=False):
             disc = disc.module
         gen.eval()
         epoch_psnr = utils.AverageMeter()
+        epoch_niqe = utils.AverageMeter()
         for idx, data in enumerate(val_dataloader):
             inputs, labels = data
             inputs = inputs.to(device)
             with torch.no_grad():
                 fake = gen(inputs)
-                img_grid_fake = torchvision.utils.make_grid(fake, normalize=True)
-                img_grid_real = torchvision.utils.make_grid(labels, normalize=True)
-                writer_test.add_image(f"Test Fake{idx}", img_grid_fake, global_step=epoch)
-                writer_gnd.add_image(f"Real{idx}", img_grid_real, global_step=None)
+            img_grid_fake = torchvision.utils.make_grid(fake.mul(255.0), normalize=True)
+            writer_test.add_image(f"Test Fake{idx}", img_grid_fake, global_step=epoch, dataformats='CHW')
             fake = fake.mul(255.0).cpu().numpy().squeeze(0)
             fake = fake.transpose([1, 2, 0])  # chw->hwc
             fake = np.clip(fake, 0.0, 255.0)
             fake = utils.rgb2ycbcr(fake).astype(np.float32)[..., 0] / 255.
+            epoch_niqe.update(niqe.calculate_niqe(fake), len(inputs))
             epoch_psnr.update(utils.calc_psnr(fake, labels.numpy()[0, 0, ...]).item(), len(inputs))
-        print('eval psnr: {:.2f}'.format(epoch_psnr.avg))
+        print('eval psnr: {:.2f}, niqe: {:.4f}'.format(epoch_psnr.avg, epoch_niqe.avg))
         writer_scalar.add_scalar('PSNR', epoch_psnr.avg, epoch)
+        writer_scalar.add_scalar('NIQE', epoch_niqe.avg, epoch)
         if config['auto_lr']:
             scheduler1.step()
             scheduler2.step()
-        best_epoch, best_psnr = model_utils.save_GAN_checkpoint(
+        best_epoch, best_psnr, best_niqe = model_utils.save_GAN_checkpoint(
             gen, gen_opt, disc, disc_opt, epoch, G_losses, D_losses,
-            epoch_psnr, best_psnr, best_epoch, outputs_dir, writer)
-    print('best epoch: {}, psnr: {:.2f}'.format(best_epoch, best_psnr))
+            epoch_psnr, epoch_niqe, best_psnr, best_niqe, best_epoch, outputs_dir, writer)
+    print('best epoch: {}, niqe: {:.4f}'.format(best_epoch, best_niqe))

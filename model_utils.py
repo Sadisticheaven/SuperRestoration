@@ -66,29 +66,31 @@ def load_GAN_checkpoint(pre_train, weight_file, gen, gen_opt, disc, disc_opt, cs
         best_epoch = checkpoint['epoch']
         start_epoch = best_epoch + 1
         best_psnr = checkpoint['psnr']
-        print('Start from Gloss: {:.6f}, psnr: {:.2f}, Dloss: {:.6f}\n'.format(
-            checkpoint['Gloss'], best_psnr, checkpoint['Dloss']))
+        best_niqe = checkpoint['niqe']
+        print('Start from Gloss: {:.6f}, psnr: {:.2f}, Dloss: {:.6f}, niqe: {:.4f}\n'.format(
+            checkpoint['Gloss'], best_psnr, checkpoint['Dloss'], best_niqe))
     else:
         csv_file = open(csv_file, 'w', newline='')
         writer = csv.writer(csv_file)
-        writer.writerow(('epoch', 'Gloss', 'psnr', 'Dloss'))
+        writer.writerow(('epoch', 'Gloss', 'psnr', 'Dloss', 'niqe'))
         if pre_train is not None:
             if not os.path.exists(pre_train):
                 print(f'Weight file not exist!\n{pre_train}\n')
                 raise "Error"
             checkpoint = torch.load(pre_train)
             gen.load_state_dict(checkpoint['model'])
-            gen_opt.load_state_dict(checkpoint['optimizer'])
-            for state in gen_opt.state.values():
-                for k, v in state.items():
-                    if torch.is_tensor(v):
-                        state[k] = v.cuda()
+            # gen_opt.load_state_dict(checkpoint['optimizer'])
+            # for state in gen_opt.state.values():
+            #     for k, v in state.items():
+            #         if torch.is_tensor(v):
+            #             state[k] = v.cuda()
         else:
             gen.init_weight()
         start_epoch = 0
         best_epoch = 0
         best_psnr = 0.0
-    return start_epoch, best_epoch, best_psnr, writer, csv_file
+        best_niqe = 0.0
+    return start_epoch, best_epoch, best_psnr, best_niqe, writer, csv_file
 
 
 def train(model, train_dataloader, optimizer, criterion, device, t):
@@ -146,16 +148,24 @@ def save_checkpoint(model, optimizer, epoch, epoch_losses, epoch_psnr, best_psnr
     return best_epoch, best_psnr
 
 
-def save_GAN_checkpoint(gen, gen_opt, disc, disc_opt, epoch, G_losses, D_losses, epoch_psnr, best_psnr, best_epoch, outputs_dir, csv_writer):
+def save_GAN_checkpoint(gen, gen_opt, disc, disc_opt, epoch, G_losses, D_losses, epoch_psnr, epoch_niqe, best_psnr, best_niqe, best_epoch, outputs_dir, csv_writer):
     state = {'gen': gen.state_dict(), 'gen_opt': gen_opt.state_dict(),
              'disc': disc.state_dict(), 'disc_opt': disc_opt.state_dict(),
              'epoch': epoch, 'Gloss': G_losses.avg, 'Dloss': D_losses.avg,
-             'psnr': epoch_psnr.avg}
+             'psnr': epoch_psnr.avg, 'niqe': epoch_niqe.avg}
     torch.save(state, outputs_dir + f'latest.pth')
-    csv_writer.writerow((state['epoch'], state['Gloss'], state['psnr'], state['Dloss']))
+    csv_writer.writerow((state['epoch'], state['Gloss'], state['psnr'], state['Dloss'], state['niqe']))
 
-    if epoch % 50 == 0:
+    if epoch_niqe.avg < best_niqe:
         best_epoch = epoch
+        best_niqe = epoch_niqe.avg
+        torch.save(state, outputs_dir + f'best_niqe.pth')
+    if epoch_psnr.avg > best_psnr:
         best_psnr = epoch_psnr.avg
-        torch.save(state, outputs_dir + f'epoch_{epoch}.pth')
-    return best_epoch, best_psnr
+        torch.save(state, outputs_dir + 'best_psnr.pth')
+    return best_epoch, best_psnr, best_niqe
+
+
+def get_lr(optimizer):
+    for param_group in optimizer.param_groups:
+        return param_group['lr']

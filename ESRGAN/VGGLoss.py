@@ -19,3 +19,8 @@ class VGGLoss(nn.Module):
         vgg_input_features = self.vgg(input)
         vgg_target_features = self.vgg(target)
         return self.loss(vgg_input_features, vgg_target_features)
+
+
+if __name__ == '__main__':
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    v = VGGLoss(device)

@@ -28,8 +28,6 @@ class ESRGANTrainDataset(Dataset):
         img_path = self.data[index]
 
         image = np.array(Image.open(img_path))
-        if image.shape[0] < 128 or image.shape[1] < 128:
-            image = imresize(image, 2, 'bicubic')
         transpose = A.Compose([
             A.RandomCrop(width=128, height=128),
             A.HorizontalFlip(p=0.5),
