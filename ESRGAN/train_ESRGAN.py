@@ -47,8 +47,8 @@ def train_model(config, pre_train, from_pth=False):
     vgg_loss = VGGLoss(device)
     gen_opt = optim.Adam(gen.parameters(), lr=config['gen_lr'])
     disc_opt = optim.Adam(disc.parameters(), lr=config['disc_lr'])
-    scheduler1 = torch.optim.lr_scheduler.MultiStepLR(gen_opt, milestones=[58, 116, 232, 348], gamma=0.5)
-    scheduler2 = torch.optim.lr_scheduler.MultiStepLR(disc_opt, milestones=[58, 116, 232, 348], gamma=0.5)
+    # scheduler1 = torch.optim.lr_scheduler.MultiStepLR(gen_opt, milestones=[58, 116, 232, 348], gamma=0.5)
+    # scheduler2 = torch.optim.lr_scheduler.MultiStepLR(disc_opt, milestones=[58, 116, 232, 348], gamma=0.5)
     # ----END------
     start_epoch, best_epoch, best_psnr, best_niqe, writer, csv_file = \
         model_utils.load_GAN_checkpoint(pre_train, config['weight_file'], gen, gen_opt, disc, disc_opt,
@@ -149,9 +149,11 @@ def train_model(config, pre_train, from_pth=False):
         print('eval psnr: {:.2f}, niqe: {:.4f}'.format(epoch_psnr.avg, epoch_niqe.avg))
         writer_scalar.add_scalar('PSNR', epoch_psnr.avg, epoch)
         writer_scalar.add_scalar('NIQE', epoch_niqe.avg, epoch)
-        if config['auto_lr']:
-            scheduler1.step()
-            scheduler2.step()
+        if config['auto_lr'] and epoch in [1, 3, 5, 10]:
+            model_utils.update_lr(gen_opt, 0.5)
+            model_utils.update_lr(disc_opt, 0.5)
+            # scheduler1.step()
+            # scheduler2.step()
         best_epoch, best_psnr, best_niqe = model_utils.save_GAN_checkpoint(
             gen, gen_opt, disc, disc_opt, epoch, G_losses, D_losses,
             epoch_psnr, epoch_niqe, best_psnr, best_niqe, best_epoch, outputs_dir, writer)

@@ -15,14 +15,8 @@ def load_checkpoint(weight_file, model, optimizer, csv_file, from_pth=False, use
         csv_file = open(csv_file, 'a', newline='')
         writer = csv.writer(csv_file)
         model.load_state_dict(checkpoint['model'])
-        old_param = optimizer.param_groups
-        optimizer.load_state_dict(checkpoint['optimizer'])
-        if not auto_lr:
-            optimizer.param_groups = old_param
-        for state in optimizer.state.values():
-            for k, v in state.items():
-                if torch.is_tensor(v):
-                    state[k] = v.cuda()
+        load_optimizer(optimizer, checkpoint['optimizer'], auto_lr)
+
         best_epoch = checkpoint['epoch']
         start_epoch = best_epoch + 1
         best_psnr = checkpoint['psnr']
@@ -45,24 +39,13 @@ def load_GAN_checkpoint(pre_train, weight_file, gen, gen_opt, disc, disc_opt, cs
         checkpoint = torch.load(weight_file)
         csv_file = open(csv_file, 'a', newline='')
         writer = csv.writer(csv_file)
+
         gen.load_state_dict(checkpoint['gen'])
-        old_param = gen_opt.param_groups
-        gen_opt.load_state_dict(checkpoint['gen_opt'])
-        if not auto_lr:
-            gen_opt.param_groups = old_param
-        for state in gen_opt.state.values():
-            for k, v in state.items():
-                if torch.is_tensor(v):
-                    state[k] = v.cuda()
+        load_optimizer(gen_opt, checkpoint['gen_opt'], auto_lr)
+
         disc.load_state_dict(checkpoint['disc'])
-        old_param = disc_opt.param_groups
-        disc_opt.load_state_dict(checkpoint['disc_opt'])
-        if not auto_lr:
-            disc_opt.param_groups = old_param
-        for state in disc_opt.state.values():
-            for k, v in state.items():
-                if torch.is_tensor(v):
-                    state[k] = v.cuda()
+        load_optimizer(disc_opt, checkpoint['disc_opt'], auto_lr)
+
         best_epoch = checkpoint['epoch']
         start_epoch = best_epoch + 1
         best_psnr = checkpoint['psnr']
@@ -79,17 +62,12 @@ def load_GAN_checkpoint(pre_train, weight_file, gen, gen_opt, disc, disc_opt, cs
                 raise "Error"
             checkpoint = torch.load(pre_train)
             gen.load_state_dict(checkpoint['model'])
-            # gen_opt.load_state_dict(checkpoint['optimizer'])
-            # for state in gen_opt.state.values():
-            #     for k, v in state.items():
-            #         if torch.is_tensor(v):
-            #             state[k] = v.cuda()
         else:
             gen.init_weight()
         start_epoch = 0
         best_epoch = 0
         best_psnr = 0.0
-        best_niqe = 0.0
+        best_niqe = 100.0
     return start_epoch, best_epoch, best_psnr, best_niqe, writer, csv_file
 
 
@@ -169,3 +147,24 @@ def save_GAN_checkpoint(gen, gen_opt, disc, disc_opt, epoch, G_losses, D_losses,
 def get_lr(optimizer):
     for param_group in optimizer.param_groups:
         return param_group['lr']
+
+
+def update_lr(optimizer, gamma):
+    for param_group in optimizer.param_groups:
+         param_group['lr'] = param_group['lr'] * gamma
+
+
+def set_lr(optimizer, lr):
+    for param_group in optimizer.param_groups:
+         param_group['lr'] = lr
+
+
+def load_optimizer(opt, file_path, auto_lr=False):
+    base_lr = opt.param_groups[0]['lr']
+    opt.load_state_dict(file_path)
+    if not auto_lr:
+        set_lr(opt, base_lr)
+    for state in opt.state.values():
+        for k, v in state.items():
+            if torch.is_tensor(v):
+                state[k] = v.cuda()
