@@ -67,7 +67,7 @@ class myThread(threading.Thread):
 
     def run(self):
         print("Start thread： " + self.name)
-        augment(self.img_list, self.t)
+        extract_subimg(self.img_list, self.t)
 
 
 def augment(img_list, t):
@@ -88,6 +88,23 @@ def augment(img_list, t):
         threadLock.release()
 
 
+def extract_subimg(img_list, t):
+    for imgName in img_list:
+        hrIMG = utils.loadIMG_crop(rootdir + imgName, scale)
+        hr = np.array(hrIMG.convert('RGB'))
+        lr = imresize(hr, 1 / scale, 'bicubic')
+        input = lr.astype(np.float32)
+
+        for r in range(0, lr.shape[0] - size_input + 1, stride):  # height
+            for c in range(0, lr.shape[1] - size_input + 1, stride):  # width
+                lr_subimgs = input[r: r + size_input, c: c + size_input]  # hwc -> chw
+                lr_subimgs = Image.fromarray(lr_subimgs.astype(np.uint8))
+                lr_subimgs.save(lrpath + imgName.replace('.', f'_r{r}_c{c}.'))
+                label = hr[r * scale: r * scale + size_label, c * scale: c * scale + size_label]
+                label = Image.fromarray(label.astype(np.uint8))
+                label.save(hrpath + imgName.replace('.', f'_r{r}_c{c}.'))
+        t.update(1)
+
 def DIV2K_aug():
     imgList = os.listdir(rootdir)
     total = len(imgList)
@@ -105,9 +122,17 @@ def DIV2K_aug():
 
 
 threadLock = threading.Lock()
-rootdir = r'./datasets/T91/'  # 指明被遍历的文件夹
+scale = 4
+size_input = 24
+size_label = 96
+stride = 12
+rootdir = r'./datasets/Set5/'  # 指明被遍历的文件夹
 savePath = './datasets/DIV2K_aug/'
+hrpath = f'./datasets/Set5_sub/HR/'
+lrpath = f'./datasets/Set5_sub/LRx{scale}/'
 utils.mkdirs(savePath)
+utils.mkdirs(hrpath)
+utils.mkdirs(lrpath)
 threads = []
 thread_num = 8
 

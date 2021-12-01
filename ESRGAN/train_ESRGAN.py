@@ -9,7 +9,7 @@ from torch.utils.tensorboard import SummaryWriter
 from VGGLoss import VGGLoss
 from model import G, D
 from torch import nn, optim
-from ESRGANdatasets import ESRGANValDataset, ESRGANTrainDataset
+from ESRGANdatasets import ESRGANValDataset, ESRGANTrainDataset, lmdbDataset
 from torch.utils.data.dataloader import DataLoader
 import numpy as np
 import niqe
@@ -47,10 +47,8 @@ def train_model(config, pre_train, from_pth=False):
     vgg_loss = VGGLoss(device)
     gen_opt = optim.Adam(gen.parameters(), lr=config['gen_lr'])
     disc_opt = optim.Adam(disc.parameters(), lr=config['disc_lr'])
-    # scheduler1 = torch.optim.lr_scheduler.MultiStepLR(gen_opt, milestones=[58, 116, 232, 348], gamma=0.5)
-    # scheduler2 = torch.optim.lr_scheduler.MultiStepLR(disc_opt, milestones=[58, 116, 232, 348], gamma=0.5)
     # ----END------
-    start_epoch, best_epoch, best_psnr, best_niqe, writer, csv_file = \
+    start_epoch, best_epoch, best_niqe, writer, csv_file = \
         model_utils.load_GAN_checkpoint(pre_train, config['weight_file'], gen, gen_opt, disc, disc_opt,
                                         csv_file, from_pth, config['auto_lr'])
 
@@ -61,8 +59,6 @@ def train_model(config, pre_train, from_pth=False):
     gen = gen.to(device)
     disc = disc.to(device)
 
-    # writer_fake = SummaryWriter(f"{logs_dir}/fake")
-    # writer_real = SummaryWriter(f"{logs_dir}/real")
     writer_scalar = SummaryWriter(f"{logs_dir}/scalar")
     writer_test = SummaryWriter(f"{logs_dir}/test")
 
@@ -118,13 +114,6 @@ def train_model(config, pre_train, from_pth=False):
                 t.set_postfix(loss='Gloss: {:.6f}, Dloss: {:.6f}, fake: {:.2f}, real: {:.2f}'
                               .format(G_losses.avg, D_losses.avg, F_prob.avg, R_prob.avg))
                 t.update(len(inputs))
-                # if batch_idx == 0:
-                #     with torch.no_grad():
-                #         fake = gen(inputs)
-                #     img_grid_fake = torchvision.utils.make_grid(fake, normalize=True)
-                #     img_grid_real = torchvision.utils.make_grid(labels, normalize=True)
-                #     writer_fake.add_image("Fake Images", img_grid_fake, global_step=epoch)
-                #     writer_real.add_image("Real Images", img_grid_real, global_step=epoch)
         writer_scalar.add_scalar('DLoss', D_losses.avg, epoch)
         writer_scalar.add_scalar('GLoss', G_losses.avg, epoch)
         if isinstance(gen, torch.nn.DataParallel):
@@ -149,12 +138,10 @@ def train_model(config, pre_train, from_pth=False):
         print('eval psnr: {:.2f}, niqe: {:.4f}'.format(epoch_psnr.avg, epoch_niqe.avg))
         writer_scalar.add_scalar('PSNR', epoch_psnr.avg, epoch)
         writer_scalar.add_scalar('NIQE', epoch_niqe.avg, epoch)
-        if config['auto_lr'] and epoch in [1, 3, 5, 10]:
+        if config['auto_lr'] and epoch in [58, 116, 232, 348]:
             model_utils.update_lr(gen_opt, 0.5)
             model_utils.update_lr(disc_opt, 0.5)
-            # scheduler1.step()
-            # scheduler2.step()
-        best_epoch, best_psnr, best_niqe = model_utils.save_GAN_checkpoint(
+        best_epoch, best_niqe = model_utils.save_GAN_checkpoint(
             gen, gen_opt, disc, disc_opt, epoch, G_losses, D_losses,
-            epoch_psnr, epoch_niqe, best_psnr, best_niqe, best_epoch, outputs_dir, writer)
+            epoch_psnr, epoch_niqe, best_niqe, best_epoch, outputs_dir, writer)
     print('best epoch: {}, niqe: {:.4f}'.format(best_epoch, best_niqe))

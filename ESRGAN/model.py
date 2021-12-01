@@ -93,6 +93,44 @@ class G(nn.Module):
         return self.conv4(x)
 
 
+class G2(nn.Module):
+    def __init__(self):
+        super(G2, self).__init__()
+        self.conv_first = nn.Conv2d(3, 64, kernel_size=3, padding=1, padding_mode=padding_mode)
+        self.body = self.make_layer(_RRDB, 23)
+        self.conv_body = nn.Conv2d(64, 64, kernel_size=3, padding=1, padding_mode=padding_mode)
+        self.conv_up1 = nn.Conv2d(64, 64, kernel_size=3, padding=1, padding_mode=padding_mode)
+        self.conv_up2 = nn.Conv2d(64, 64, kernel_size=3, padding=1, padding_mode=padding_mode)
+        self.conv_hr = nn.Conv2d(64, 64, kernel_size=3, padding=1, padding_mode=padding_mode)
+        self.conv_last = nn.Conv2d(64, 3, kernel_size=3, padding=1, padding_mode=padding_mode)
+        self.lrelu = nn.LeakyReLU(0.2, True)
+
+    def make_layer(self, block, num_of_layer):
+        layers = []
+        for _ in range(num_of_layer):
+            layers.append(block())
+        return nn.Sequential(*layers)
+
+    def init_weight(self):
+        for L in self.modules():
+            if isinstance(L, nn.Conv2d):
+                nn.init.kaiming_normal_(L.weight)
+                L.weight.data *= 0.1
+                L.bias.data.fill_(0)
+
+    def forward(self, x):
+        x = self.conv_first(x)
+        identity = x
+        x = self.body(x)
+        x = self.conv_body(x)
+        x = x + identity
+
+        x = self.lrelu(self.conv_up1(F.interpolate(x, scale_factor=2, mode='nearest')))
+        x = self.lrelu(self.conv_up2(F.interpolate(x, scale_factor=2, mode='nearest')))
+        x = self.lrelu(self.conv_hr(x))
+        return self.conv_last(x)
+
+
 class D(nn.Module):
     def __init__(self):
         super(D, self).__init__()

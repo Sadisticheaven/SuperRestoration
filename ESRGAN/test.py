@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from torch.backends import cudnn
 import utils
-from model import G
+from model import G, G2
 from PIL import Image
 from imresize import imresize
 import os
@@ -10,13 +10,13 @@ import niqe
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 if __name__ == '__main__':
     model_name = 'ESRGAN'
-    test_data = 'PIRM'
+    test_data = 'Set14'
     # config = {'weight_file': './',
     # config = {'weight_file': './weight_file/ESRGAN_pre_x4_DFO_lr=2e-4_batch=16_out=128/',
-    config = {'weight_file': './weight_file/ESRGAN_x4_DFO_lr=e-4_batch=16_out=128/',
+    config = {'weight_file': './weight_file/ESRGAN4_x4_DFO_lr=e-4_batch=16_out=128/',
     # config = {'weight_file': './weight_file/',
               'img_dir': f'../datasets/{test_data}/',
-              'outputs_dir': f'./test_res/test_{model_name}_{test_data}/',
+              'outputs_dir': f'./test_res/test_{model_name}4_2_{test_data}/',
               'scale': 4,
               'visual_filter': False
               }
@@ -25,8 +25,9 @@ if __name__ == '__main__':
     padding = scale
     # weight_file = config['weight_file'] + f'best.pth'
     # weight_file = config['weight_file'] + f'latest.pth'
-    # weight_file = config['weight_file'] + f'x{scale}/best.pth'
-    weight_file = config['weight_file'] + f'x{scale}/latest.pth'
+    # weight_file = config['weight_file'] + f'ESRGAN_SRx4_DF2KOST_official-ff704c30.pth'
+    # weight_file = config['weight_file'] + f'x{scale}/latest_G.pth'
+    weight_file = config['weight_file'] + f'x{scale}/best_niqe.pth'
     img_dir = config['img_dir']
     outputs_dir = outputs_dir + f'x{scale}/'
     utils.mkdirs(outputs_dir)
@@ -41,14 +42,12 @@ if __name__ == '__main__':
 
     model = G().to(device)
     checkpoint = torch.load(weight_file)
-    if model_name == 'ESRGAN':
-        model.load_state_dict(checkpoint['gen'])
-    else:
-        model.load_state_dict(checkpoint['model'])
+    model.load_state_dict(checkpoint['gen'])
+    # model.load_state_dict(checkpoint['params'])
 
     if config['visual_filter']:
-        ax = utils.viz_layer(model.extract_layer[0].weight.cpu(), 56)
-        ax = utils.viz_layer(model.deconv_layer.weight.cpu(), 56)
+        ax = utils.viz_layer(model.conv1.weight.cpu(), 64)
+        ax = utils.viz_layer(model.conv3.weight.cpu(), 64)
     model.eval()
     imglist = os.listdir(img_dir)
     Avg_psnr = utils.AverageMeter()
@@ -62,26 +61,26 @@ if __name__ == '__main__':
         hr_image = np.array(image)
 
         lr_image = imresize(hr_image, 1. / scale, 'bicubic')
-        bic_image = imresize(lr_image, scale, 'bicubic')[padding: -padding, padding: -padding, ...]
-        bic_pil = Image.fromarray(bic_image.astype(np.uint8))
+        # bic_image = imresize(lr_image, scale, 'bicubic')[padding: -padding, padding: -padding, ...]
+        # bic_pil = Image.fromarray(bic_image.astype(np.uint8))
         # bic_pil.save(outputs_dir + imgName.replace('.', f'_bicubic_x{scale}.'))
 
         lr = lr_image.astype(np.float32).transpose([2, 0, 1])  # hwc -> chw
         lr /= 255.
         lr = torch.from_numpy(lr).to(device).unsqueeze(0)
 
-        # hr_image = hr_image[padding: -padding, padding: -padding, ...]
+        hr_image = hr_image[padding: -padding, padding: -padding, ...]
 
         with torch.no_grad():
             SR = model(lr)
-        # SR = SR[..., padding: -padding, padding: -padding]
+        SR = SR[..., padding: -padding, padding: -padding]
         SR = SR.mul(255.0).cpu().numpy().squeeze(0)
         SR = np.clip(SR, 0.0, 255.0).transpose([1, 2, 0])
         if img_mode != 'L':
             SR_y = utils.rgb2ycbcr(SR).astype(np.float32)[..., 0] / 255.
             hr_y = utils.rgb2ycbcr(hr_image).astype(np.float32)[..., 0]/255.
         else:
-            # gray_img = gray_img.astype(np.float32)[padding: -padding, padding: -padding, ...]
+            gray_img = gray_img.astype(np.float32)[padding: -padding, padding: -padding, ...]
             hr_y = gray_img / 255.
             SR = Image.fromarray(SR.astype(np.uint8)).convert('L')
             SR_y = np.array(SR).astype(np.float32) / 255.
@@ -90,6 +89,7 @@ if __name__ == '__main__':
         Avg_psnr.update(psnr, 1)
         Avg_niqe.update(NIQE, 1)
         print(f'{imgName}, ' + 'PSNR: {:.2f} , NIQE: {:.4f}'.format(psnr.item(), NIQE))
+        # print(f'{imgName}, ' + 'PSNR: {:.2f}'.format(psnr.item()))
         # GPU tensor -> CPU tensor -> numpy
         output = np.array(SR).astype(np.uint8)
         output = Image.fromarray(output) # hw -> wh

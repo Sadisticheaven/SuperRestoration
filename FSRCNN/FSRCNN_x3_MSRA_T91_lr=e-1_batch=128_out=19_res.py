@@ -7,9 +7,10 @@ if __name__ == '__main__':
     label_size = 19
     config = {'train_file': f'../datasets/T91_aug_label={label_size}_train_FSRCNNx{scale}_res.h5',
               'val_file': f'../datasets/Set5_label={label_size}_val_FSRCNNx{scale}_res.h5',
-              'outputs_dir': f'./weight_file/{program}/x{scale}/',
+              'outputs_dir': f'../weight_file/{program}/',
+              'logs_dir': f'../logs/{program}/',
               'csv_name': f'{program}.csv',
-              'weight_file': f'./weight_file/{program}/x{scale}/latest.pth',
+              'weight_file': f'./weight_file/{program}/latest.pth',
               'scale': scale,
               'in_size': 11,
               'out_size': label_size,
@@ -27,4 +28,4 @@ if __name__ == '__main__':
               'residual': True
               }
 
-    train_model(config, from_pth=True, useVisdom=True)
+    train_model(config, from_pth=True)

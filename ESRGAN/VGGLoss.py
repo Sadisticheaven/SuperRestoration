@@ -8,7 +8,7 @@ class VGGLoss(nn.Module):
         super().__init__()
         print('===> Loading VGG model')
         netVGG = vgg19()
-        netVGG.load_state_dict(torch.load('./VGG19/vgg19-dcbb9e9d.pth'))
+        netVGG.load_state_dict(torch.load('../VGG19/vgg19-dcbb9e9d.pth'))
         self.vgg = netVGG.features[:35].eval().to(device)  # VGG54, before activation
         self.loss = nn.MSELoss()
 

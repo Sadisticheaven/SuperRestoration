@@ -1,4 +1,6 @@
 import csv
+
+from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 import utils
 import os
@@ -9,24 +11,21 @@ from torch import nn, optim
 from SRCNNdatasets import TrainDataset, ValDataset
 from torch.utils.data.dataloader import DataLoader
 import model_utils
-# 导入Visdom类
-from visdom import Visdom
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 
 
-def train_model(config, from_pth=False, useVisdom=False):
+def train_model(config, from_pth=False):
     os.environ['CUDA_VISIBLE_DEVICES'] = config['Gpu']
-    if useVisdom:
-        viz = Visdom(env='SRCNN')
-    else:
-        viz = None
+
     outputs_dir = config['outputs_dir']
     lr = config['lr']
     batch_size = config['batch_size']
     num_epochs = config['num_epochs']
     csv_file = outputs_dir + config['csv_name']
+    logs_dir = config['logs_dir']
     utils.mkdirs(outputs_dir)
+    utils.mkdirs(logs_dir)
 
     cudnn.benchmark = True
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -53,12 +52,13 @@ def train_model(config, from_pth=False, useVisdom=False):
     val_dataloader = DataLoader(dataset=val_dataset, batch_size=1)
 
     start_epoch, best_epoch, best_psnr, writer, csv_file = \
-        model_utils.load_checkpoint(config['weight_file'], model, optimizer, csv_file, from_pth, useVisdom, viz)
+        model_utils.load_checkpoint(config['weight_file'], model, optimizer, csv_file, from_pth)
 
     if torch.cuda.device_count() > 1:
         print("Using GPUs.\n")
         model = torch.nn.DataParallel(model)
     model = model.to(device)
+    writer_scalar = SummaryWriter(f"{logs_dir}/scalar")
 
     for epoch in range(start_epoch, num_epochs):
         with tqdm(total=(len(train_dataset) - len(train_dataset) % batch_size)) as t:
@@ -69,9 +69,9 @@ def train_model(config, from_pth=False, useVisdom=False):
             model = model.module
 
         epoch_psnr = model_utils.validate(model, val_dataloader, device)
-        if useVisdom:
-            utils.draw_line(viz, X=[epoch], Y=[epoch_losses.avg], win='Loss', linename='trainLoss')
-            utils.draw_line(viz, X=[epoch], Y=[epoch_psnr.avg], win='PSNR', linename='valPSNR')
+
+        writer_scalar.add_scalar('Loss', epoch_losses.avg, epoch)
+        writer_scalar.add_scalar('PSNR', epoch_psnr.avg, epoch)
 
         best_epoch, best_psnr = model_utils.save_checkpoint(model, optimizer, epoch, epoch_losses,
                                                             epoch_psnr, best_psnr, best_epoch, outputs_dir, writer)

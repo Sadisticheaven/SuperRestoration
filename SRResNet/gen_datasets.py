@@ -4,6 +4,7 @@ import os
 import utils
 from imresize import imresize
 from tqdm import tqdm
+from PIL import Image
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 
 

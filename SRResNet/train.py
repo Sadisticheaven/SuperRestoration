@@ -11,8 +11,6 @@ from torch import nn, optim
 from SRResNetdatasets import SRResNetValDataset, SRResNetTrainDataset, DIV2KDataset
 from torch.utils.data.dataloader import DataLoader
 import numpy as np
-# 导入Visdom类
-from visdom import Visdom
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 
 

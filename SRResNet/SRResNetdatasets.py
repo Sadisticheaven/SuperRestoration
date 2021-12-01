@@ -64,6 +64,31 @@ class DIV2KDataset(Dataset):
         return data, label
 
 
+class DIV2KSubDataset(Dataset):
+    def __init__(self, hr_dir='../datasets/DIV2K_sub/HR/', lr_dir='../datasets/DIV2K_sub/LRx4/'):
+        super(DIV2KSubDataset, self).__init__()
+        self.hr_data = []
+        self.lr_data = []
+        self.img_names = os.listdir(hr_dir)
+
+        for name in self.img_names:
+            self.hr_data.append(hr_dir + name)
+            self.lr_data.append(lr_dir + name)
+
+    def __len__(self):
+        return len(self.hr_data)
+
+    def __getitem__(self, index):
+        hr_img_path = self.hr_data[index]
+        lr_img_path = self.lr_data[index]
+
+        hr_image = np.array(Image.open(hr_img_path))
+        lr_image = np.array(Image.open(lr_img_path))
+        label = torch.from_numpy(hr_image.astype(np.float32).transpose([2, 0, 1])/127.5-1)
+        data = torch.from_numpy(lr_image.astype(np.float32).transpose([2, 0, 1]) / 255)
+        return data, label
+
+
 def test():
     dataset = DIV2KDataset(root_dir='../datasets/T91/')
     loader = DataLoader(dataset, batch_size=1, num_workers=0)

@@ -7,9 +7,10 @@ if __name__ == '__main__':
     label_size = 19
     config = {'train_file': f'../datasets/T91_aug_label={label_size}_train_FSRCNNx{scale}_res.h5',
               'val_file': f'../datasets/Set5_label={label_size}_val_FSRCNNx{scale}_res.h5',
-              'outputs_dir': f'./weight_file/{program}/x{scale}/',
+              'outputs_dir': f'./weight_file/{program}/',
+              'logs_dir': f'./weight_file/{program}/',
               'csv_name': f'{program}.csv',
-              'weight_file': f'./weight_file/{program}/x{scale}/latest.pth',
+              'weight_file': f'./weight_file/{program}/latest.pth',
               'scale': scale,
               'in_size': 11,
               'out_size': label_size,
@@ -18,7 +19,6 @@ if __name__ == '__main__':
               'lr': 1e-1,
               'step_size': 1500,
               'gamma': 0.1,
-              'gradient_clip': 1,
               'weight_decay': 0,
               'batch_size': 128,
               'num_epochs': 50000,
@@ -32,4 +32,4 @@ if __name__ == '__main__':
               'delta': 0.8
               }
 
-    train_model(config, from_pth=False, useVisdom=False)
+    train_model(config, from_pth=False)

@@ -121,7 +121,8 @@ class D(nn.Module):
     def forward(self, x):
         x = self.features(x)
         x = self.dense(x)
-        return torch.sigmoid(x)
+        return x
+        # return torch.sigmoid(x)
 
 
 def test():
