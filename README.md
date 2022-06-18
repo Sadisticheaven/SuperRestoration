@@ -5,8 +5,8 @@ Include：SRCNN、FSRCNN、SRResNet、SRGAN
 ## Why wrote this?
 There are many ***Pytorch*** implementations of these networks on the web, but they do not appear exactly as described in the paper, so the results are quite different from the paper.
 So I've provided a version that's as close to the paper as possible.  
-Hopefully it will help those interested in **Super-Resolution** networks get started.
-
+Hopefully it will help those interested in **Super-Resolution** networks get started.  
+For more details:https://zhuanlan.zhihu.com/p/431724297
 # Install
 You can clone this repository directly, and run it without installing.
 
