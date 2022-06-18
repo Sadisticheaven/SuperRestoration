@@ -41,7 +41,6 @@ def train_model(config, from_pth=False):
         model.init_weight()
     criterion = nn.L1Loss().cuda()
     optimizer = optim.Adam(model.parameters(), lr=config['lr'])
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=232, gamma=0.5)
     # ----END------
     start_epoch, best_epoch, best_psnr, writer, csv_file = \
         model_utils.load_checkpoint(config['weight_file'], model, optimizer, csv_file,
@@ -80,8 +79,8 @@ def train_model(config, from_pth=False):
             preds = utils.rgb2ycbcr(preds).astype(np.float32)[..., 0]/255.
             epoch_psnr.update(utils.calc_psnr(preds, labels.numpy()[0, 0, ...]).item(), len(inputs))
         print('eval psnr: {:.2f}'.format(epoch_psnr.avg))
-        if config['auto_lr']:
-            scheduler.step()
+        if config['auto_lr'] and (epoch+1) % 232 == 0:
+            model_utils.update_lr(optimizer, 0.5)
 
         writer_scalar.add_scalar('PSNR', epoch_psnr.avg, epoch)
         writer_scalar.add_scalar('Loss', epoch_losses.avg, epoch)

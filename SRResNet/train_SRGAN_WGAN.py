@@ -45,7 +45,7 @@ def train_model(config, pre_train, from_pth=False):
     # ----END------
     start_step, best_step, best_niqe, writer, csv_file = \
         model_utils.load_GAN_checkpoint_iter(pre_train, config['weight_file'], gen, gen_opt, disc, disc_opt,
-                                             csv_file, from_pth)
+                                             csv_file, from_pth, config['auto_lr'])
 
     if torch.cuda.device_count() > 1:
         print("Using GPUs.\n")
@@ -58,17 +58,21 @@ def train_model(config, pre_train, from_pth=False):
     dataloaders = {'train': train_dataloader, 'val': val_dataloader}
     num_steps = config['num_steps']
     iter_of_epoch = 1000
-    global_info = {'device': device, 'step': start_step, 't': None, 'auto_lr': config['auto_lr'], 'milestone': config['milestone'],
+    global_info = {'device': device, 'step': start_step, 't': None, 'auto_lr': config['auto_lr'],
+                   'milestone': config['milestone'],
                    'tb_writer': tb_writer, 'outputs_dir': outputs_dir, 'csv_writer': writer, 'num_steps': num_steps,
-                   'best_step': best_step, 'iter_of_epoch': iter_of_epoch, 'best_niqe': best_niqe,
+                   'best_step': best_step, 'batch_no': -1, 'iter_of_epoch': iter_of_epoch, 'best_niqe': best_niqe,
                    'pixel_weight': config['pixel_weight'], 'adversarial_weight': config['adversarial_weight'],
                    'disc_k': config['gen_k'], 'gen_k': config['disc_k']}
-    log_dict = {'D_losses': utils.AverageMeter(), 'G_losses': utils.AverageMeter(),
-                'F_prob': utils.AverageMeter(), 'R_prob': utils.AverageMeter()}
+    log_dict = {'D_losses': 0., 'G_losses': 0.,
+                'D_losses_real': 0., 'D_losses_fake': 0.,
+                'pixel_loss': 0., 'gan_loss': 0.,
+                'percep_loss': 0.,
+                'F_prob': 0., 'R_prob': 0.}
     while global_info['step'] < config['num_steps']:
         with tqdm(total=len(train_dataset)) as t:
             t.set_description('step:{}/{}'.format(global_info['step'], num_steps - 1))
             global_info['t'] = t
             model_utils.train_SRGAN_iter(gen, disc, dataloaders, gen_opt, disc_opt, criterion, global_info, log_dict, use_WGAN=True)
 
-    print('best step: {}, niqe: {:.2f}'.format(global_info['best_step'], global_info['best_psnr']))
+    print('best step: {}, niqe: {:.2f}'.format(global_info['best_step'], global_info['best_niqe']))

@@ -10,7 +10,7 @@ import niqe
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 if __name__ == '__main__':
     model_name = 'SRGAN'
-    test_data = 'Set14'
+    test_data = 'Set5'
     # config = {'weight_file': './weight_file/',
     # config = {'weight_file': './weight_file/SRGAN4_x4_MSRA_DIV2Kaug_lr=e-4_batch=16_out=96/',
     # config = {'weight_file': './weight_file/SRGAN9_x4_DIVsubResnet_WGAN/',
@@ -27,8 +27,8 @@ if __name__ == '__main__':
     padding = scale
     # weight_file = config['weight_file'] + f'best.pth'
     # weight_file = config['weight_file'] + f'x{scale}/latest.pth'
-    weight_file = config['weight_file'] + f'x{scale}/step_235.pth'
-    # weight_file = config['weight_file'] + f'x{scale}/latest.pth'
+    # weight_file = config['weight_file'] + f'x{scale}/step_235.pth'
+    weight_file = config['weight_file'] + f'x{scale}/latest.pth'
     # weight_file = config['weight_file'] + f'x{scale}/best_niqe.pth'
     img_dir = config['img_dir']
     outputs_dir = outputs_dir + f'x{scale}/'
@@ -88,13 +88,19 @@ if __name__ == '__main__':
         SR = np.clip(SR, 0.0, 255.0).transpose([1, 2, 0])
         if img_mode != 'L':
             SR_y = utils.rgb2ycbcr(SR).astype(np.float32)[..., 0] / 255.
+            # bic_y = BasicSR_utils.rgb2ycbcr(bic_image).astype(np.float32)[..., 0] / 255.
             hr_y = utils.rgb2ycbcr(hr_image).astype(np.float32)[..., 0]/255.
         else:
+            # bic_image = imresize(gray_img, 1. / scale, 'bicubic')
+            # bic_y = imresize(bic_image, scale, 'bicubic')[padding: -padding, padding: -padding, ...]
+            # bic_y = bic_y.astype(np.float32) / 255.
+
             gray_img = gray_img.astype(np.float32)[padding: -padding, padding: -padding, ...]
             hr_y = gray_img / 255.
             SR = Image.fromarray(SR.astype(np.uint8)).convert('L')
             SR_y = np.array(SR).astype(np.float32) / 255.
         psnr = utils.calc_psnr(hr_y, SR_y)
+        # psnr = BasicSR_utils.calc_psnr(hr_y, bic_y)
         NIQE = niqe.calculate_niqe(SR_y)
         Avg_psnr.update(psnr, 1)
         Avg_niqe.update(NIQE, 1)

@@ -4,7 +4,7 @@ import torch
 import matplotlib.pyplot as plt
 import numpy as np
 import os
-from PIL import Image
+from PIL import Image, ImageChops
 
 
 def mkdirs(path):
@@ -153,3 +153,18 @@ def ycbcr2rgb(ycbcr):
     rgb = np.dot(rgb, np.linalg.inv(m.transpose()) * 255.)
     rgb = np.round(rgb)
     return rgb.clip(0, 255).reshape(shape)
+
+
+# 平移
+def ImgOffSet(Img, xoff, yoff):
+    width, height = Img.size
+    c = ImageChops.offset(Img, xoff, yoff)
+    c.paste((0, 0, 0), (0, 0, xoff, height))
+    c.paste((0, 0, 0), (0, 0, width, yoff))
+    return c
+
+
+if __name__ == '__main__':
+    pass
+
+

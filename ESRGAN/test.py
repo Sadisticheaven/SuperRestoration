@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from torch.backends import cudnn
 import utils
-from model import G, G2
+from model import G, D
 from PIL import Image
 from imresize import imresize
 import os
@@ -10,13 +10,13 @@ import niqe
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 if __name__ == '__main__':
     model_name = 'ESRGAN'
-    test_data = 'Set14'
+    test_data = 'BSDS100'
     # config = {'weight_file': './',
     # config = {'weight_file': './weight_file/ESRGAN_pre_x4_DFO_lr=2e-4_batch=16_out=128/',
-    config = {'weight_file': './weight_file/ESRGAN4_x4_DFO_lr=e-4_batch=16_out=128/',
+    config = {'weight_file': './weight_file/ESRGAN8_x4_DFO_lr=e-4_batch=16_out=128/',
     # config = {'weight_file': './weight_file/',
               'img_dir': f'../datasets/{test_data}/',
-              'outputs_dir': f'./test_res/test_{model_name}4_2_{test_data}/',
+              'outputs_dir': f'./test_res/test_{model_name}8_{test_data}/',
               'scale': 4,
               'visual_filter': False
               }
@@ -27,7 +27,9 @@ if __name__ == '__main__':
     # weight_file = config['weight_file'] + f'latest.pth'
     # weight_file = config['weight_file'] + f'ESRGAN_SRx4_DF2KOST_official-ff704c30.pth'
     # weight_file = config['weight_file'] + f'x{scale}/latest_G.pth'
-    weight_file = config['weight_file'] + f'x{scale}/best_niqe.pth'
+    weight_file = config['weight_file'] + f'x{scale}/latest.pth'
+    # weight_file = config['weight_file'] + f'net_g_latest.pth'
+    # weight_file = config['weight_file'] + f'x{scale}/best_niqe.pth'
     img_dir = config['img_dir']
     outputs_dir = outputs_dir + f'x{scale}/'
     utils.mkdirs(outputs_dir)
@@ -42,8 +44,13 @@ if __name__ == '__main__':
 
     model = G().to(device)
     checkpoint = torch.load(weight_file)
+    # disc = D()
+    # disc_opt = torch.optim.Adam(disc.parameters(), lr=0)
+    # disc_opt.load_state_dict(checkpoint['disc_opt'])
+    # model.load_state_dict(checkpoint['gen'])
+    # checkpoint.update({'best_epoch': 547, 'best_psnr': checkpoint['psnr']})
+    # torch.save(checkpoint, outputs_dir + f'latest.pth')
     model.load_state_dict(checkpoint['gen'])
-    # model.load_state_dict(checkpoint['params'])
 
     if config['visual_filter']:
         ax = utils.viz_layer(model.conv1.weight.cpu(), 64)

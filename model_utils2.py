@@ -295,98 +295,83 @@ def iterate_SRWGAN(gen, disc, gen_opt, disc_opt, criterion, batch_idx, data, glo
     inputs, labels = data
     inputs = inputs.to(device)
     labels = labels.to(device)
-    global_info['batch_no'] += 1
-    # optimize net_g
-    for p in disc.parameters():
-        p.requires_grad = False
+    # Train Disciminator  max(ED(x) - ED(G(z)))
     fake = gen(inputs)
-    # Train Generator min(log(1-D(G(z))) <-> max logD(G(z))
-    disc_fake = disc(fake)
-    pixel_loss = global_info['pixel_weight'] * criterion['pixel_loss'](fake, labels)
-    gan_loss = global_info['adversarial_weight'] * (-disc_fake.mean())
-    percep_loss = 2e-6 * criterion['vgg_loss']((fake + 1.) / 2, (labels + 1.) / 2)
-    gen_loss = percep_loss + gan_loss + pixel_loss
-    gen_opt.zero_grad()
-    gen_loss.backward()
-    gen_opt.step()
-    # Train Disciminator  max(logD(x) + log(1-D(G(z))))
-    for p in disc.parameters():
-        p.requires_grad = True
-    disc_opt.zero_grad()
-    disc_real = disc(labels)
-    disc_loss_real = -disc_real.mean()
-    disc_loss_real.backward()
-
-    disc_fake = disc(fake.detach())
-    disc_loss_fake = disc_fake.mean()
-    disc_loss_fake.backward()
-
-    disc_opt.step()
-    for p in disc.parameters():
-        p.data.clamp_(-0.01, 0.01)
-    with torch.no_grad():
-        log_dict['pixel_loss'] = pixel_loss.mean().item()
-        log_dict['gan_loss'] = gan_loss.mean().item()
-        log_dict['percep_loss'] = percep_loss.mean().item()
-        log_dict['G_losses'] = gen_loss.mean().item()
-        log_dict['D_losses_real'] = disc_loss_real.item()
-        log_dict['D_losses_fake'] = disc_loss_fake.item()
-        log_dict['D_losses'] = log_dict['D_losses_real'] + log_dict['D_losses_fake']
-        log_dict['F_prob'] = disc_fake.detach().mean().item()
-        log_dict['R_prob'] = disc_real.detach().mean().item()
+    if batch_idx % global_info['disc_k'] == 0:
+        disc_real = disc(labels)
+        disc_fake = disc(fake.detach())
+        disc_loss = -(disc_real.mean() - disc_fake.mean())
+        disc_opt.zero_grad()
+        disc_loss.backward()
+        disc_opt.step()
+        log_dict['D_losses'].update(disc_loss.item(), len(inputs))
+        for p in disc.parameters():
+            p.data.clamp_(-0.01, 0.01)
+    else:
+        with torch.no_grad():
+            disc_real = disc(labels)
+            disc_fake = disc(fake.detach())
+    # Train Generator min(-ED(G(z))) <-> max ED(G(z))
+    if batch_idx % global_info['gen_k'] == 0:
+        disc_fake = disc(fake)
+        adversarial_loss = -disc_fake.mean()
+        content_loss = 2e-6 * criterion['vgg_loss']((fake+1.)/2, (labels+1.)/2)
+        # content_loss = 0.006 * criterion['vgg_loss']((fake+1.)/2, (labels+1.)/2)
+        gen_loss = content_loss + global_info['adversarial_weight'] * adversarial_loss + \
+                   global_info['pixel_weight'] * criterion['pixel_loss'](fake, labels)
+        gen_opt.zero_grad()
+        gen_loss.backward()
+        gen_opt.step()
+        log_dict['G_losses'].update(gen_loss.item(), len(inputs))
     # log
+    log_dict['F_prob'].update(disc_fake.mean(), 1)
+    log_dict['R_prob'].update(disc_real.mean(), 1)
     global_info['t'].set_postfix(loss='Gloss: {:.6f}, Dloss: {:.6f}, fake: {:.2f}, real: {:.2f}'
-                                 .format(log_dict['G_losses'], log_dict['D_losses'],
-                                         log_dict['F_prob'], log_dict['R_prob']))
+                                 .format(log_dict['G_losses'].avg, log_dict['D_losses'].avg,
+                                         log_dict['F_prob'].avg, log_dict['R_prob'].avg))
     global_info['t'].update(len(inputs))
 
 
-def iterate_SRGAN(gen, disc, gen_opt, disc_opt, criterion, data, global_info, log_dict):
+def iterate_SRGAN(gen, disc, gen_opt, disc_opt, criterion, batch_idx, data, global_info, log_dict):
     device = global_info['device']
     inputs, labels = data
     inputs = inputs.to(device)
     labels = labels.to(device)
-    global_info['batch_no'] += 1
-    # optimize net_g
-    for p in disc.parameters():
-        p.requires_grad = False
-    fake = gen(inputs)
-    # Train Generator min(log(1-D(G(z))) <-> max logD(G(z))
-    disc_fake = disc(fake)
-    pixel_loss = global_info['pixel_weight'] * criterion['pixel_loss'](fake, labels)
-    gan_loss = global_info['adversarial_weight'] * criterion['bce'](disc_fake, torch.ones_like(disc_fake))
-    percep_loss = 2e-6 * criterion['vgg_loss']((fake + 1.) / 2, (labels + 1.) / 2)
-    gen_loss = percep_loss + gan_loss + pixel_loss
-    gen_opt.zero_grad()
-    gen_loss.backward()
-    gen_opt.step()
     # Train Disciminator  max(logD(x) + log(1-D(G(z))))
-    for p in disc.parameters():
-        p.requires_grad = True
-    disc_opt.zero_grad()
-    disc_real = disc(labels)
-    disc_loss_real = 0.5 * criterion['bce'](disc_real, torch.ones_like(disc_real))
-    disc_loss_real.backward()
-
-    disc_fake = disc(fake.detach())
-    disc_loss_fake = 0.5 * criterion['bce'](disc_fake, torch.zeros_like(disc_fake))
-    disc_loss_fake.backward()
-
-    disc_opt.step()
-    with torch.no_grad():
-        log_dict['pixel_loss'] = pixel_loss.mean().item()
-        log_dict['gan_loss'] = gan_loss.mean().item()
-        log_dict['percep_loss'] = percep_loss.mean().item()
-        log_dict['G_losses'] = gen_loss.mean().item()
-        log_dict['D_losses_real'] = disc_loss_real.mean().item()
-        log_dict['D_losses_fake'] = disc_loss_fake.mean().item()
-        log_dict['D_losses'] = log_dict['D_losses_real'] + log_dict['D_losses_fake']
-        log_dict['F_prob'] = disc_fake.detach().mean().item()
-        log_dict['R_prob'] = disc_real.detach().mean().item()
+    fake = gen(inputs)
+    if batch_idx % global_info['disc_k'] == 0:
+        disc_real = disc(labels)
+        disc_fake = disc(fake.detach())
+        disc_loss_real = criterion['bce'](disc_real, torch.ones_like(disc_real))
+        disc_loss_fake = criterion['bce'](disc_fake, torch.zeros_like(disc_fake))
+        disc_loss = (disc_loss_real + disc_loss_fake) / 2
+        disc_opt.zero_grad()
+        disc_loss.backward()
+        disc_opt.step()
+        log_dict['D_losses'].update(disc_loss.item(), len(inputs))
+    else:
+        with torch.no_grad():
+            disc_real = disc(labels)
+            disc_fake = disc(fake.detach())
+    # Train Generator min(log(1-D(G(z))) <-> max logD(G(z))
+    if batch_idx % global_info['gen_k'] == 0:
+        disc_fake = disc(fake)
+        adversarial_loss = criterion['bce'](disc_fake, torch.ones_like(disc_fake))  # output a positive num
+        # content_loss = 0.006 * criterion['vgg_loss'](fake, labels)
+        content_loss = 2e-6 * criterion['vgg_loss']((fake + 1.) / 2, (labels + 1.) / 2)
+        # content_loss = mse(fake, labels)
+        gen_loss = content_loss + global_info['adversarial_weight'] * adversarial_loss + \
+                   global_info['pixel_weight'] * criterion['pixel_loss'](fake, labels)
+        gen_opt.zero_grad()
+        gen_loss.backward()
+        gen_opt.step()
+        log_dict['G_losses'].update(gen_loss.item(), len(inputs))
     # log
+    log_dict['F_prob'].update(disc_fake.mean(), 1)
+    log_dict['R_prob'].update(disc_real.mean(), 1)
     global_info['t'].set_postfix(loss='Gloss: {:.6f}, Dloss: {:.6f}, fake: {:.2f}, real: {:.2f}'
-                                 .format(log_dict['G_losses'], log_dict['D_losses'],
-                                         log_dict['F_prob'], log_dict['R_prob']))
+                                 .format(log_dict['G_losses'].avg, log_dict['D_losses'].avg,
+                                         log_dict['F_prob'].avg, log_dict['R_prob'].avg))
     global_info['t'].update(len(inputs))
 
 
@@ -402,13 +387,13 @@ def train_SRGAN_iter(gen, disc, dataloaders, gen_opt, disc_opt, criterion, globa
     for batch_idx, data in enumerate(train_dataloader):
         iterate(gen, disc, gen_opt, disc_opt, criterion, batch_idx, data, global_info, log_dict)
         # log per epoch
-        if (global_info['batch_no'] + 1) % global_info['iter_of_epoch'] == 0:
+        if (batch_idx + 1) % global_info['iter_of_epoch'] == 0:
             global_info['step'] += 1
             step = global_info['step']
             # update learning rate
             if global_info['auto_lr'] and step in global_info['milestone']:
-                update_lr(gen_opt, 0.5)
-                update_lr(disc_opt, 0.5)
+                update_lr(gen_opt, 0.1)
+                update_lr(disc_opt, 0.1)
                 print('learning rate: Gen: {}, Disc: {}\n'.format(get_lr(gen_opt), get_lr(disc_opt)))
             # for multi-GPU
             if isinstance(gen, torch.nn.DataParallel):
@@ -418,20 +403,16 @@ def train_SRGAN_iter(gen, disc, dataloaders, gen_opt, disc_opt, criterion, globa
                 gen2 = copy.deepcopy(gen)
                 disc2 = copy.deepcopy(disc)
             # validation and log
-            global_info['tb_writer']['scalar'].add_scalar('DLoss_real', log_dict['D_losses_real'], global_info['step'])
-            global_info['tb_writer']['scalar'].add_scalar('DLoss_fake', log_dict['D_losses_fake'], global_info['step'])
-            global_info['tb_writer']['scalar'].add_scalar('pixel_loss', log_dict['pixel_loss'], global_info['step'])
-            global_info['tb_writer']['scalar'].add_scalar('gan_loss', log_dict['gan_loss'], global_info['step'])
-            global_info['tb_writer']['scalar'].add_scalar('percep_loss', log_dict['percep_loss'], global_info['step'])
-            global_info['tb_writer']['scalar'].add_scalar('GLoss', log_dict['G_losses'], global_info['step'])
-            global_info['tb_writer']['scalar'].add_scalar('DLoss', log_dict['D_losses'], global_info['step'])
-            global_info.update({'Gloss': log_dict['G_losses'], 'Dloss': log_dict['D_losses']})
+            global_info['tb_writer']['scalar'].add_scalar('DLoss', log_dict['D_losses'].avg, global_info['step'])
+            global_info['tb_writer']['scalar'].add_scalar('GLoss', log_dict['G_losses'].avg, global_info['step'])
+            global_info.update({'Gloss': log_dict['G_losses'].avg, 'Dloss': log_dict['D_losses'].avg})
             val_SRGAN(gen2, val_dataloader, global_info)
             # save
             save_GAN_checkpoint_iter(gen2, gen_opt, disc2, disc_opt, global_info)
-            # # update for next iteration
+            # update for next iteration
+            log_dict.update({'D_losses': utils.AverageMeter(), 'G_losses': utils.AverageMeter(),
+                        'F_prob': utils.AverageMeter(), 'R_prob': utils.AverageMeter()})
             global_info['t'].set_description('step:{}/{}'.format(step, global_info['num_steps'] - 1), refresh=True)
-            global_info['batch_no'] = -1
 
 
 def train_ESRGAN_iter(gen, disc, dataloaders, gen_opt, disc_opt, criterion, global_info, log_dict):
@@ -581,10 +562,8 @@ def save_GAN_checkpoint_iter(gen, gen_opt, disc, disc_opt, global_info):
              'step': global_info['step'], 'Gloss': global_info['Gloss'], 'Dloss': global_info['Dloss'],
              'psnr': global_info['psnr'], 'niqe': global_info['niqe'],
              'best_niqe': global_info['best_niqe'], 'best_step': global_info['best_step']}
+    torch.save(state, global_info['outputs_dir'] + f'latest.pth')
     global_info['csv_writer'].writerow((state['step'], state['Gloss'], state['psnr'], state['Dloss'], state['niqe']))
-
-    if (global_info['step'] + 1) % 50 == 0:
-        torch.save(state, global_info['outputs_dir'] + f'latest.pth')
 
     if global_info['niqe'] < global_info['best_niqe']:
         global_info['best_step'] = global_info['step']
@@ -592,6 +571,9 @@ def save_GAN_checkpoint_iter(gen, gen_opt, disc, disc_opt, global_info):
         state['best_niqe'] = global_info['best_niqe']
         state['best_step'] = global_info['best_step']
         torch.save(state, global_info['outputs_dir'] + f'best_niqe.pth')
+    if (global_info['step']) % 10 == 0:
+        state = {'gen': gen.state_dict(), 'psnr': global_info['psnr'], 'niqe': global_info['niqe']}
+        torch.save(state, global_info['outputs_dir'] + 'step_{}.pth'.format(global_info['step']))
 
 
 def get_lr(optimizer):

@@ -60,14 +60,15 @@ def T291_aug():
 
 
 class myThread(threading.Thread):
-    def __init__(self, img_list, t):
+    def __init__(self, img_list, t, func):
         threading.Thread.__init__(self)
         self.img_list = img_list
         self.t = t
+        self.func = func
 
     def run(self):
         print("Start thread： " + self.name)
-        extract_subimg(self.img_list, self.t)
+        self.func(self.img_list, self.t)
 
 
 def augment(img_list, t):
@@ -105,6 +106,7 @@ def extract_subimg(img_list, t):
                 label.save(hrpath + imgName.replace('.', f'_r{r}_c{c}.'))
         t.update(1)
 
+
 def DIV2K_aug():
     imgList = os.listdir(rootdir)
     total = len(imgList)
@@ -112,14 +114,44 @@ def DIV2K_aug():
     with tqdm(total=total) as t:
         for i in range(thread_num):
             if i == thread_num-1:
-                thread = myThread(imgList[seg * i: total], t)
+                thread = myThread(imgList[seg * i: total], t, augment)
             else:
-                thread = myThread(imgList[seg*i: seg*(i+1)], t)
+                thread = myThread(imgList[seg*i: seg*(i+1)], t, augment)
             thread.start()
             threads.append(thread)
         for th in threads:
             th.join()
 
+
+def DF2KOST_LR():
+    imgList = []
+    for root_dir in rootdirs:
+        img_names = os.listdir(root_dir)
+        for name in img_names:
+            imgList.append([root_dir, name])
+    total = len(imgList)
+    seg = total // thread_num
+    with tqdm(total=total) as t:
+        for i in range(thread_num):
+            if i == thread_num-1:
+                thread = myThread(imgList[seg * i: total], t, gen_HRLR)
+            else:
+                thread = myThread(imgList[seg*i: seg*(i+1)], t, gen_HRLR)
+            thread.start()
+            threads.append(thread)
+        for th in threads:
+            th.join()
+
+def gen_HRLR(img_list, t):
+    for dir, imgName in img_list:
+        hrIMG = utils.loadIMG_crop(dir + imgName, scale)
+        hr = np.array(hrIMG.convert('RGB'))
+        lr = imresize(hr, 1 / scale, 'bicubic')
+        lr = Image.fromarray(lr.astype(np.uint8))
+        lr.save(lrpath + imgName)
+        hr = Image.fromarray(hr.astype(np.uint8))
+        hr.save(hrpath + imgName)
+        t.update(1)
 
 threadLock = threading.Lock()
 scale = 4
@@ -127,9 +159,11 @@ size_input = 24
 size_label = 96
 stride = 12
 rootdir = r'./datasets/Set5/'  # 指明被遍历的文件夹
+# rootdirs = ['./datasets/Set5/']
+rootdirs = ['../datasets/DIV2K_train_HR/', '../datasets/Flickr2K/Flickr2K_HR/', '../datasets/OST/']
 savePath = './datasets/DIV2K_aug/'
-hrpath = f'./datasets/Set5_sub/HR/'
-lrpath = f'./datasets/Set5_sub/LRx{scale}/'
+hrpath = f'./datasets/DF2K+OST/HR/'
+lrpath = f'./datasets/DF2K+OST/LRx{scale}/'
 utils.mkdirs(savePath)
 utils.mkdirs(hrpath)
 utils.mkdirs(lrpath)
@@ -137,4 +171,5 @@ threads = []
 thread_num = 8
 
 if __name__ == '__main__':
-    DIV2K_aug()
+    # DIV2K_aug()
+    DF2KOST_LR()
